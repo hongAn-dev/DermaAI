@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "71384070933",
+    "firebase_url": "https://realtimefrb-27357-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "realtimefrb-27357",
+    "storage_bucket": "realtimefrb-27357.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:71384070933:android:167753ded7831aa72d071c",
+        "android_client_info": {
+          "package_name": "com.example.loginandsignupfrbrealtime"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCC7Mf95BdQoAtpVvURa81PxEHwU56pIKU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:71384070933:android:4e4cb7c8f9e614c32d071c",
+        "android_client_info": {
+          "package_name": "com.example.myapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCC7Mf95BdQoAtpVvURa81PxEHwU56pIKU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
