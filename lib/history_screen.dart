@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/responsive_scaffold.dart';
 
-class ScanScreen extends StatelessWidget {
-  const ScanScreen({super.key});
+class HistoryScreen extends StatelessWidget {
+  const HistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return const ResponsiveScaffold(
-      selectedIndex: 1, // Updated index
+      selectedIndex: 3, // Updated index
       child: Center(
-        child: Text('Scan Screen'),
+        child: Text('History Screen'),
       ),
     );
   }
