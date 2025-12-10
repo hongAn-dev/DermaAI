@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:myapp/models/analysis_model.dart';
-import 'package:myapp/services/firestore_service.dart';
+import 'package:myapp/services/realtime_database_service.dart'; // Updated import
 import 'package:myapp/screens/responsive_scaffold.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -15,9 +15,8 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  final FirestoreService _firestoreService = FirestoreService();
+  final RealtimeDatabaseService _rtdbService = RealtimeDatabaseService(); // Updated service
 
-  // Helper function to group analyses by month and year
   Map<String, List<AnalysisResult>> _groupAnalysesByMonth(
       List<AnalysisResult> analyses) {
     final Map<String, List<AnalysisResult>> grouped = {};
@@ -57,7 +56,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ],
         ),
         body: StreamBuilder<List<AnalysisResult>>(
-          stream: _firestoreService.getAnalysesStream(),
+          stream: _rtdbService.getAnalysisHistory(), // Updated stream source
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -70,6 +69,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
             }
 
             final analyses = snapshot.data!;
+            // Sort by timestamp descending before grouping
+            analyses.sort((a, b) => b.timestamp.compareTo(a.timestamp));
             final groupedData = _groupAnalysesByMonth(analyses);
             final months = groupedData.keys.toList();
 
@@ -154,9 +155,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       shadowColor: Colors.grey.withOpacity(0.1),
       child: InkWell(
         onTap: () {
-          // TODO: Navigate to history detail screen
-          // context.go('/history/${record.id}', extra: record);
-           print("Tapped on: ${record.id}"); // Placeholder action
+          // Placeholder for future detail screen navigation
         },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
@@ -245,7 +244,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  // Helper class for risk profile
   ({String level, Color backgroundColor, Color textColor}) _getRiskProfile(double probability) {
     if (probability > 75) {
       return (

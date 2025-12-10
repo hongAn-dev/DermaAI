@@ -1,12 +1,14 @@
 
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/models/analysis_model.dart';
 import 'package:myapp/services/api_service.dart';
 import 'package:myapp/services/firestore_service.dart';
+import 'package:myapp/services/realtime_database_service.dart'; // Import new service
 import 'package:percent_indicator/linear_percent_indicator.dart';
 import 'package:uuid/uuid.dart';
 
@@ -14,7 +16,6 @@ class AnalysisResultsScreen extends StatefulWidget {
   final AnalysisResponse analysisResult;
   final Uint8List imageBytes;
 
-  // Constructor fixed: Removed the unnecessary imageFile parameter.
   const AnalysisResultsScreen({
     super.key,
     required this.analysisResult,
@@ -26,7 +27,8 @@ class AnalysisResultsScreen extends StatefulWidget {
 }
 
 class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
-  final FirestoreService _firestoreService = FirestoreService();
+  final FirestoreService _firestoreService = FirestoreService(); // Kept for image upload
+  final RealtimeDatabaseService _rtdbService = RealtimeDatabaseService(); // New RTDB service
   final Uuid _uuid = const Uuid();
   late Uint8List _heatmapBytes;
 
@@ -36,35 +38,28 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
     widget.analysisResult.details.sort((a, b) => b.probability.compareTo(a.probability));
     _heatmapBytes = base64Decode(widget.analysisResult.heatmapImage);
 
-    // Save the analysis after the first frame is built.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _saveAnalysis();
     });
   }
 
   Future<void> _saveAnalysis() async {
+    if (!mounted) return;
+
     try {
-      final user = _firestoreService.currentUser;
+      final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        // This is a critical point. If there's no user, we can't save.
-        print("User not logged in. Cannot save analysis.");
-        return; // Exit the function early.
+        throw Exception("User is not logged in.");
       }
 
-      final topPrediction = widget.analysisResult.prediction;
       final analysisId = _uuid.v4();
-
-      // Upload the image using the byte data.
+      // Still use firestore service to upload the image
       final imageUrl = await _firestoreService.uploadImage(widget.imageBytes, analysisId);
-      if(imageUrl == null) {
-          print("Image upload failed. Aborting save.");
-          return;
-      }
+      final topPrediction = widget.analysisResult.prediction;
 
-      // Create the result object to save, ensuring userId is included.
       final analysisToSave = AnalysisResult(
         id: analysisId,
-        userId: user.uid, // This is crucial for Firestore rules.
+        userId: user.uid,
         disease: topPrediction.className,
         probability: double.tryParse(topPrediction.confidence.replaceAll('%', '')) ?? 0.0,
         recommendation: "Consult a dermatologist for a professional opinion.",
@@ -72,15 +67,25 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
         timestamp: DateTime.now(),
       );
 
-      // Save the analysis to Firestore.
-      await _firestoreService.saveAnalysis(analysisToSave);
-      print("Analysis saved successfully!");
+      // Save to Realtime Database
+      await _rtdbService.saveAnalysisResult(analysisToSave);
 
-    } catch (e) {
-      print("Error saving analysis: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving analysis result: ${e.toString()}')),
+          const SnackBar(
+            content: Text('Successfully saved to history.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save to history: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -189,18 +194,26 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
   }
 
   Widget _buildImageDisplayCard(Uint8List imageBytes) {
-    return AspectRatio(
-      aspectRatio: 1 / 1,
-      child: Card(
-        elevation: 2,
-        shadowColor: Colors.grey.withOpacity(0.1),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        clipBehavior: Clip.antiAlias,
-        child: _imageFromBytes(imageBytes),
-      ),
-    );
+    try {
+      return AspectRatio(
+        aspectRatio: 1 / 1,
+        child: Card(
+          elevation: 2,
+          shadowColor: Colors.grey.withOpacity(0.1),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          clipBehavior: Clip.antiAlias,
+          child: _imageFromBytes(imageBytes),
+        ),
+      );
+    } catch (e) {
+      return AspectRatio(
+          aspectRatio: 1 / 1,
+          child: Container(
+            color: Colors.grey[200],
+            child: const Icon(Icons.broken_image, color: Colors.grey, size: 30),
+          ));
+    }
   }
-
 
   Widget _buildBreakdownCard(List<DiseaseDetail> details) {
      return Card(

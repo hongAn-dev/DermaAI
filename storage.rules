@@ -1,0 +1,10 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Chỉ cho phép người dùng đã xác thực tải lên tệp vào thư mục `user_scans`
+    // Tệp phải nằm trong thư mục con có tên là ID người dùng của họ.
+    match /user_scans/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
