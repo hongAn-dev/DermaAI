@@ -1,5 +1,5 @@
 
-import 'dart:io';
+import 'dart:typed_data'; // Import for Uint8List
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,12 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:myapp/services/api_service.dart';
 import 'package:myapp/screens/responsive_scaffold.dart';
 
-// Data class to hold the necessary data for the analysis results screen
+// Updated data class to use image bytes for web compatibility
 class AnalysisScreenNavData {
   final AnalysisResponse analysisResult;
-  final File imageFile;
+  final Uint8List imageBytes; // Changed from File to Uint8List
 
-  AnalysisScreenNavData({required this.analysisResult, required this.imageFile});
+  AnalysisScreenNavData({required this.analysisResult, required this.imageBytes});
 }
 
 class ScanScreen extends StatefulWidget {
@@ -36,21 +36,22 @@ class _ScanScreenState extends State<ScanScreen> {
     );
     if (imageXFile == null || !mounted) return;
 
-    final imageFile = File(imageXFile.path);
+    // Read image data into a Uint8List for cross-platform compatibility
+    final imageBytes = await imageXFile.readAsBytes();
 
     setState(() { _isLoading = true; });
 
     try {
       final analysisResult = await _apiService.analyzeImage(imageXFile);
       
-      // Stop loading before navigating or showing a snackbar
       if (!mounted) return;
       setState(() { _isLoading = false; });
 
       if (analysisResult != null) {
+        // Use the updated nav data with imageBytes
         final navData = AnalysisScreenNavData(
           analysisResult: analysisResult,
-          imageFile: imageFile,
+          imageBytes: imageBytes,
         );
         context.go('/analysis_results', extra: navData);
       } else {
@@ -59,7 +60,6 @@ class _ScanScreenState extends State<ScanScreen> {
         );
       }
     } catch (e) {
-      // Ensure loading is stopped even on error
       if (mounted) {
         setState(() { _isLoading = false; });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -153,10 +153,10 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Widget _buildOptionCard({required IconData icon, required String text, required VoidCallback onTap}) {
     return InkWell(
-      onTap: _isLoading ? null : onTap, // Disable tap when loading
+      onTap: _isLoading ? null : onTap,
       borderRadius: BorderRadius.circular(24),
       child: Opacity(
-         opacity: _isLoading ? 0.5 : 1.0, // Dim the card when loading
+         opacity: _isLoading ? 0.5 : 1.0,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 40),
           decoration: BoxDecoration(

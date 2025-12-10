@@ -1,6 +1,5 @@
 
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -13,12 +12,13 @@ import 'package:uuid/uuid.dart';
 
 class AnalysisResultsScreen extends StatefulWidget {
   final AnalysisResponse analysisResult;
-  final File imageFile;
+  final Uint8List imageBytes;
 
+  // Constructor fixed: Removed the unnecessary imageFile parameter.
   const AnalysisResultsScreen({
     super.key,
     required this.analysisResult,
-    required this.imageFile,
+    required this.imageBytes,
   });
 
   @override
@@ -36,6 +36,7 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
     widget.analysisResult.details.sort((a, b) => b.probability.compareTo(a.probability));
     _heatmapBytes = base64Decode(widget.analysisResult.heatmapImage);
 
+    // Save the analysis after the first frame is built.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _saveAnalysis();
     });
@@ -43,18 +44,27 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
 
   Future<void> _saveAnalysis() async {
     try {
+      final user = _firestoreService.currentUser;
+      if (user == null) {
+        // This is a critical point. If there's no user, we can't save.
+        print("User not logged in. Cannot save analysis.");
+        return; // Exit the function early.
+      }
+
       final topPrediction = widget.analysisResult.prediction;
       final analysisId = _uuid.v4();
 
-      final imageUrl = await _firestoreService.uploadImage(widget.imageFile, analysisId);
-
-      if (imageUrl == null) {
-        print("Failed to upload image. Aborting save.");
-        return;
+      // Upload the image using the byte data.
+      final imageUrl = await _firestoreService.uploadImage(widget.imageBytes, analysisId);
+      if(imageUrl == null) {
+          print("Image upload failed. Aborting save.");
+          return;
       }
 
+      // Create the result object to save, ensuring userId is included.
       final analysisToSave = AnalysisResult(
         id: analysisId,
+        userId: user.uid, // This is crucial for Firestore rules.
         disease: topPrediction.className,
         probability: double.tryParse(topPrediction.confidence.replaceAll('%', '')) ?? 0.0,
         recommendation: "Consult a dermatologist for a professional opinion.",
@@ -62,6 +72,7 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
         timestamp: DateTime.now(),
       );
 
+      // Save the analysis to Firestore.
       await _firestoreService.saveAnalysis(analysisToSave);
       print("Analysis saved successfully!");
 
@@ -69,7 +80,7 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
       print("Error saving analysis: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error saving analysis result.')),
+          SnackBar(content: Text('Error saving analysis result: ${e.toString()}')),
         );
       }
     }
@@ -103,7 +114,7 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
           children: [
             _buildSummaryCard(context, widget.analysisResult.prediction),
             const SizedBox(height: 24),
-            _buildHeatmapCard(_heatmapBytes),
+            _buildImageComparisonCard(widget.imageBytes, _heatmapBytes),
             const SizedBox(height: 24),
             _buildBreakdownCard(widget.analysisResult.details),
             const SizedBox(height: 24),
@@ -155,38 +166,44 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
     );
   }
 
-  Widget _buildHeatmapCard(Uint8List imageBytes) {
+  Widget _buildImageComparisonCard(Uint8List originalBytes, Uint8List heatmapBytes) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 8.0, bottom: 12.0),
-          child: Text(
-            'AI Focus Area (Grad-CAM)',
-            style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            Text("Original Image", style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text("AI Focus Area", style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
         ),
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: AspectRatio(
-              aspectRatio: 1 / 1,
-              child: Card(
-                elevation: 2,
-                shadowColor: Colors.grey.withOpacity(0.1),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                clipBehavior: Clip.antiAlias,
-                child: _imageFromBytes(imageBytes),
-              ),
-            ),
-          ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _buildImageDisplayCard(originalBytes)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildImageDisplayCard(heatmapBytes)),
+          ],
         ),
       ],
     );
   }
 
+  Widget _buildImageDisplayCard(Uint8List imageBytes) {
+    return AspectRatio(
+      aspectRatio: 1 / 1,
+      child: Card(
+        elevation: 2,
+        shadowColor: Colors.grey.withOpacity(0.1),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        clipBehavior: Clip.antiAlias,
+        child: _imageFromBytes(imageBytes),
+      ),
+    );
+  }
+
+
   Widget _buildBreakdownCard(List<DiseaseDetail> details) {
-    return Card(
+     return Card(
       elevation: 2,
       shadowColor: Colors.grey.withOpacity(0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

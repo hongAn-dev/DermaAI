@@ -1,0 +1,13 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Bất kỳ tài liệu nào trong bộ sưu tập 'analyses'
+    match /analyses/{analysisId} {
+      // Chỉ cho phép tạo, đọc, cập nhật, xóa nếu người dùng đã đăng nhập
+      // và userId của tài liệu khớp với uid của người yêu cầu.
+      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+  }
+}
