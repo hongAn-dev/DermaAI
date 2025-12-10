@@ -30,6 +30,10 @@ class ProfileScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => context.go('/home'), // Navigate back to home
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
@@ -40,6 +44,7 @@ class ProfileScreen extends StatelessWidget {
             fontSize: 24,
           ),
         ),
+        centerTitle: true, // Center the title
       ),
       body: Center(
         child: ConstrainedBox(
@@ -97,7 +102,7 @@ class ProfileScreen extends StatelessWidget {
         children: [
           const CircleAvatar(
             radius: 30,
-            backgroundImage: NetworkImage('https://i.pravatar.cc/150?u=a042581f4e29026704d'),
+            backgroundImage: AssetImage('assets/images/default_avatar.png'),
           ),
           const SizedBox(width: 16),
           Column(
@@ -176,6 +181,7 @@ class ProfileScreen extends StatelessWidget {
       child: TextButton(
         onPressed: () async {
           await FirebaseAuth.instance.signOut();
+           if (!context.mounted) return;
           context.go('/login');
         },
         child: Text(

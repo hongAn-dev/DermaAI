@@ -25,6 +25,10 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text,
         password: _passwordController.text,
       );
+      
+      // Add mounted check to prevent using context on an unmounted widget
+      if (!mounted) return;
+      
       // Navigate to home on success
       context.go('/home');
     } on FirebaseAuthException catch (e) {
