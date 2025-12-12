@@ -1,4 +1,5 @@
 
+import 'dart:developer' as developer;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart'; // Add this import
@@ -8,7 +9,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 // Screens
 import 'package:myapp/screens/scan/scan_screen.dart';
-import 'package:myapp/screens/scan/analysis_results_screen.dart';
 import 'package:myapp/screens/consult/consult_screen.dart';
 import 'package:myapp/screens/history/history_screen.dart';
 import 'package:myapp/screens/home/home_screen.dart';
@@ -28,10 +28,20 @@ import 'package:myapp/screens/profile/privacy_policy_screen.dart';
 import 'firebase_options.dart';
 
 void main() async {
+  developer.log("--- Starting main() ---");
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  // Explicitly set the database URL to ensure connection to the correct region
-  FirebaseDatabase.instance.databaseURL = 'https://realtimefrb-27357-default-rtdb.asia-southeast1.firebasedatabase.app';
+
+  if (Firebase.apps.isEmpty) {
+    developer.log("--- Firebase not initialized, initializing now... ---");
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    FirebaseDatabase.instance.databaseURL = 'https://realtimefrb-27357-default-rtdb.asia-southeast1.firebasedatabase.app';
+  } else {
+    developer.log("--- Firebase already initialized, skipping initialization. ---");
+  }
+
+  developer.log("--- Running runApp() ---");
   runApp(MyApp());
 }
 
@@ -64,21 +74,6 @@ class MyApp extends StatelessWidget {
         GoRoute(path: '/scan', builder: (context, state) => const ScanScreen()),
         GoRoute(path: '/history', builder: (context, state) => const HistoryScreen()),
         GoRoute(path: '/consult', builder: (context, state) => const ConsultScreen()),
-        GoRoute(
-          path: '/analysis_results',
-          builder: (context, state) {
-            final AnalysisScreenNavData? navData = state.extra as AnalysisScreenNavData?;
-            if (navData != null) {
-              // Corrected: Call the constructor with the correct parameters.
-              return AnalysisResultsScreen(
-                analysisResult: navData.analysisResult,
-                imageBytes: navData.imageBytes,
-              );
-            } else {
-              return const ScanScreen(); // Fallback
-            }
-          },
-        ),
         GoRoute(path: '/model_performance', builder: (context, state) => const ModelPerformanceScreen()),
       ],
       redirect: (BuildContext context, GoRouterState state) {

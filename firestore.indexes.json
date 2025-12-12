@@ -1,0 +1,18 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "scan_history",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "scanResult.userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "scanResult.timestamp",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ]
+}

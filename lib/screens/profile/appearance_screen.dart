@@ -88,7 +88,7 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF18A0FB),
+        activeThumbColor: const Color(0xFF18A0FB),
       ),
     );
   }

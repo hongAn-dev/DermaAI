@@ -1,11 +1,11 @@
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:myapp/models/analysis_model.dart';
-import 'package:myapp/services/realtime_database_service.dart'; // Updated import
 import 'package:myapp/screens/responsive_scaffold.dart';
+import 'dart:developer' as developer;
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -15,23 +15,45 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  final RealtimeDatabaseService _rtdbService = RealtimeDatabaseService(); // Updated service
 
-  Map<String, List<AnalysisResult>> _groupAnalysesByMonth(
-      List<AnalysisResult> analyses) {
-    final Map<String, List<AnalysisResult>> grouped = {};
-    for (var analysis in analyses) {
-      final monthYear = DateFormat('MMMM yyyy').format(analysis.timestamp);
-      if (grouped[monthYear] == null) {
-        grouped[monthYear] = [];
+  Map<String, List<QueryDocumentSnapshot>> _groupAnalysesByMonth(
+      List<QueryDocumentSnapshot> docs) {
+    final Map<String, List<QueryDocumentSnapshot>> grouped = {};
+    // Sort documents locally since we removed the orderBy from the query
+    docs.sort((a, b) {
+      final aData = a.data() as Map<String, dynamic>?;
+      final bData = b.data() as Map<String, dynamic>?;
+      final aTimestamp = (aData?['scanResult']?['timestamp'] as Timestamp?)?.toDate() ?? DateTime(1970);
+      final bTimestamp = (bData?['scanResult']?['timestamp'] as Timestamp?)?.toDate() ?? DateTime(1970);
+      return bTimestamp.compareTo(aTimestamp); // Descending order
+    });
+
+    for (var doc in docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final scanResult = data['scanResult'] as Map<String, dynamic>?;
+      final timestamp = (scanResult?['timestamp'] as Timestamp?)?.toDate();
+
+      if (timestamp != null) {
+        final monthYear = DateFormat('MMMM yyyy').format(timestamp);
+        if (grouped[monthYear] == null) {
+          grouped[monthYear] = [];
+        }
+        grouped[monthYear]!.add(doc);
       }
-      grouped[monthYear]!.add(analysis);
     }
     return grouped;
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      developer.log("DEBUG: Current User ID in History Screen: ${user.uid}", name: 'history.screen');
+    } else {
+      developer.log("DEBUG: User is not logged in.", name: 'history.screen');
+    }
+
     return ResponsiveScaffold(
       selectedIndex: 3,
       child: Scaffold(
@@ -44,46 +66,42 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           backgroundColor: Colors.transparent,
           elevation: 0,
-          actions: [
-            IconButton(
-                icon: const Icon(Icons.search, color: Colors.black), 
-                onPressed: () { /* TODO: Implement search functionality */ }
-            ),
-            IconButton(
-                icon: const Icon(Icons.more_vert, color: Colors.black),
-                onPressed: () { /* TODO: Implement filter/sort options */ }
-            ),
-          ],
         ),
-        body: StreamBuilder<List<AnalysisResult>>(
-          stream: _rtdbService.getAnalysisHistory(), // Updated stream source
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(child: Text("Error: ${snapshot.error}"));
-            }
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return _buildEmptyState();
-            }
+        body: user == null
+            ? const Center(child: Text('Please log in to see your history.'))
+            : StreamBuilder<QuerySnapshot>(
+                // DIAGNOSTIC TEST: Temporarily removed .orderBy to isolate the index issue.
+                stream: FirebaseFirestore.instance
+                    .collection('scan_history')
+                    .where('scanResult.userId', isEqualTo: user.uid)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    developer.log("Firestore Stream Error", name: 'history.screen', error: snapshot.error, stackTrace: snapshot.stackTrace);
+                    return Center(child: Text("An error occurred: ${snapshot.error}"));
+                  }
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                     developer.log("Stream has no data or is empty.", name: 'history.screen');
+                    return _buildEmptyState();
+                  }
 
-            final analyses = snapshot.data!;
-            // Sort by timestamp descending before grouping
-            analyses.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-            final groupedData = _groupAnalysesByMonth(analyses);
-            final months = groupedData.keys.toList();
+                  final docs = snapshot.data!.docs;
+                  final groupedData = _groupAnalysesByMonth(docs);
+                  final months = groupedData.keys.toList();
 
-            return ListView.builder(
-              itemCount: months.length,
-              itemBuilder: (context, index) {
-                final month = months[index];
-                final records = groupedData[month]!;
-                return _buildMonthSection(month, records);
-              },
-            );
-          },
-        ),
+                  return ListView.builder(
+                    itemCount: months.length,
+                    itemBuilder: (context, index) {
+                      final month = months[index];
+                      final records = groupedData[month]!;
+                      return _buildMonthSection(month, records);
+                    },
+                  );
+                },
+              ),
       ),
     );
   }
@@ -122,7 +140,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildMonthSection(String month, List<AnalysisResult> records) {
+  Widget _buildMonthSection(String month, List<QueryDocumentSnapshot> records) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Column(
@@ -139,130 +157,65 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ),
           ),
-          ...records.map((record) => _buildHistoryCard(context, record)).toList(),
+          ...records.map((record) => _buildHistoryCard(context, record)),
         ],
       ),
     );
   }
 
-  Widget _buildHistoryCard(BuildContext context, AnalysisResult record) {
-    final risk = _getRiskProfile(record.probability);
+  Widget _buildHistoryCard(BuildContext context, QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+
+    final scanResultData = data['scanResult'] as Map<String, dynamic>?;
+    final predictionData = scanResultData?['prediction'] as Map<String, dynamic>?;
+    final predictionText = predictionData?['className'] as String? ?? 'Analysis result not available.';
+    final confidenceScore = predictionData?['confidenceScore'] as num? ?? 0.0;
+
+    final timestamp = (scanResultData?['timestamp'] as Timestamp?)?.toDate();
+
+    final statusColor = predictionText.toLowerCase().contains('malignant') 
+      ? Colors.red.shade700 
+      : Colors.green.shade700;
 
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       shadowColor: Colors.grey.withOpacity(0.1),
-      child: InkWell(
-        onTap: () {
-          // Placeholder for future detail screen navigation
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
-            children: [
-              _buildThumbnail(record.imageUrl),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      record.disease,
-                      style: GoogleFonts.manrope(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                       overflow: TextOverflow.ellipsis,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            Icon(Icons.circle, color: statusColor, size: 12),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    predictionText,
+                    style: GoogleFonts.manrope(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      DateFormat('MMM dd, hh:mm a').format(record.timestamp),
-                      style: GoogleFonts.manrope(fontSize: 14, color: Colors.grey[600]),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: risk.backgroundColor,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        risk.level,
-                        style: GoogleFonts.manrope(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: risk.textColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildThumbnail(String imageUrl) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12.0),
-      child: Image.network(
-        imageUrl,
-        width: 60,
-        height: 60,
-        fit: BoxFit.cover,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return Container(
-            width: 60,
-            height: 60,
-            color: Colors.grey[200],
-            child: Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2.0,
-                value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                    : null,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Confidence: ${(confidenceScore * 100).toStringAsFixed(1)}%',
+                     style: GoogleFonts.manrope(fontSize: 14, color: Colors.grey[700]),
+                  ),
+                ],
               ),
             ),
-          );
-        },
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            width: 60,
-            height: 60,
-            color: Colors.grey[200],
-            child: const Icon(Icons.broken_image, color: Colors.grey, size: 30),
-          );
-        },
+            const SizedBox(width: 16),
+            Text(
+              timestamp != null ? DateFormat('MMM dd').format(timestamp) : '',
+              style: GoogleFonts.manrope(fontSize: 13, color: Colors.grey[600]),
+            ),
+          ],
+        ),
       ),
-    );
-  }
-
-  ({String level, Color backgroundColor, Color textColor}) _getRiskProfile(double probability) {
-    if (probability > 75) {
-      return (
-        level: 'High Risk',
-        backgroundColor: Colors.red.shade100,
-        textColor: Colors.red.shade900
-      );
-    }
-    if (probability > 40) {
-      return (
-        level: 'Monitor',
-        backgroundColor: Colors.orange.shade100,
-        textColor: Colors.orange.shade900
-      );
-    }
-    return (
-      level: 'Low Risk',
-      backgroundColor: Colors.green.shade100,
-      textColor: Colors.green.shade900
     );
   }
 }

@@ -1,5 +1,4 @@
 
-import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -10,69 +9,63 @@ class FirestoreService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Get the current user
+  static const String _collectionName = 'scan_history';
+
   User? get currentUser => _auth.currentUser;
 
-  /// Uploads image data (Uint8List) to Firebase Storage and returns the download URL.
-  Future<String> uploadImage(Uint8List imageData, String analysisId) async {
+  /// Saves raw analysis data (as a Map) to the 'scan_history' collection.
+  Future<void> saveRawAnalysisResult(String docId, Map<String, dynamic> data) async {
+    if (currentUser == null) throw Exception("User not logged in");
     try {
-      if (currentUser == null) throw Exception("User not logged in");
-      final String userId = currentUser!.uid;
-      final ref =
-          _storage.ref().child('user_scans').child(userId).child('$analysisId.jpg');
-
-      // Use putData for web and mobile compatibility
-      final uploadTask = await ref.putData(imageData);
-      return await uploadTask.ref.getDownloadURL();
+      await _db.collection(_collectionName).doc(docId).set(data);
     } catch (e) {
-      print("Error uploading image: $e");
-      rethrow; // Rethrow to let the UI handle it
+      print("Error saving raw analysis: \$e");
+      rethrow;
     }
   }
 
-  /// Saves a new skin analysis result to Firestore.
-  Future<void> saveAnalysis(AnalysisResult result) async {
-    try {
-      if (currentUser == null) throw Exception("User not logged in");
-      final docRef = _db.collection('analyses').doc(result.id);
-      await docRef.set(result.toJson());
-    } catch (e) {
-      print("Error saving analysis: $e");
-      rethrow; // Rethrow to be caught by the UI
-    }
-  }
-
-  /// Retrieves a stream of analysis results for the current user.
+  /// Retrieves and transforms a stream of analysis results.
   Stream<List<AnalysisResult>> getAnalysesStream() {
     if (currentUser == null) return Stream.value([]);
 
     return _db
-        .collection('analyses')
-        .where('userId', isEqualTo: currentUser!.uid)
-        .orderBy('timestamp', descending: true)
+        .collection(_collectionName)
+        .where('scanResult.userId', isEqualTo: currentUser!.uid)
+        .orderBy('scanResult.timestamp', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => AnalysisResult.fromJson(doc.data()))
-          .toList();
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        final scanResult = data['scanResult'] as Map<String, dynamic>? ?? {};
+        final prediction = scanResult['prediction'] as Map<String, dynamic>? ?? {};
+        
+        final detailsList = (scanResult['details'] as List<dynamic>?)
+                ?.map((d) => d as Map<String, dynamic>)
+                .toList() ??
+            [];
+
+        return AnalysisResult(
+          id: doc.id,
+          userId: scanResult['userId'] as String? ?? '',
+          disease: prediction['className'] as String? ?? 'N/A',
+          probability: (prediction['confidenceScore'] as num?)?.toDouble() ?? 0.0,
+          recommendation: "Consult a dermatologist for a professional opinion.",
+          imageUrl: data['imagePath'] as String? ?? '', // Will be empty
+          timestamp: (scanResult['timestamp'] as Timestamp? ?? Timestamp.now()).toDate(),
+          details: detailsList.map((d) => DiseaseDetail.fromJson(d)).toList(),
+        );
+      }).toList();
     });
   }
 
-  /// Deletes a specific analysis result from Firestore and the corresponding image from Storage.
-  Future<void> deleteAnalysis(String analysisId, String imageUrl) async {
+  /// Deletes a specific analysis result from Firestore.
+  Future<void> deleteAnalysis(String analysisId) async {
+    if (currentUser == null) throw Exception("User not logged in");
     try {
-      if (currentUser == null) throw Exception("User not logged in");
-
-      // Delete the document from Firestore
-      await _db.collection('analyses').doc(analysisId).delete();
-
-      // Delete the image from Firebase Storage
-      if (imageUrl.isNotEmpty) {
-        final ref = _storage.refFromURL(imageUrl);
-        await ref.delete();
-      }
+      // Only delete the document from Firestore.
+      await _db.collection(_collectionName).doc(analysisId).delete();
     } catch (e) {
-      print("Error deleting analysis: $e");
+      print("Error deleting analysis: \$e");
       rethrow;
     }
   }

@@ -1,16 +1,16 @@
 
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/models/analysis_model.dart';
-import 'package:myapp/services/api_service.dart';
 import 'package:myapp/services/firestore_service.dart';
-import 'package:myapp/services/realtime_database_service.dart'; // Import new service
 import 'package:percent_indicator/linear_percent_indicator.dart';
 import 'package:uuid/uuid.dart';
+import 'dart:developer' as developer;
 
 class AnalysisResultsScreen extends StatefulWidget {
   final AnalysisResponse analysisResult;
@@ -27,10 +27,10 @@ class AnalysisResultsScreen extends StatefulWidget {
 }
 
 class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
-  final FirestoreService _firestoreService = FirestoreService(); // Kept for image upload
-  final RealtimeDatabaseService _rtdbService = RealtimeDatabaseService(); // New RTDB service
+  final FirestoreService _firestoreService = FirestoreService();
   final Uuid _uuid = const Uuid();
   late Uint8List _heatmapBytes;
+  bool _isSaved = false;
 
   @override
   void initState() {
@@ -44,6 +44,9 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
   }
 
   Future<void> _saveAnalysis() async {
+    const String logName = 'firestore.save';
+    developer.log('Starting analysis save process...', name: logName);
+
     if (!mounted) return;
 
     try {
@@ -53,33 +56,44 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
       }
 
       final analysisId = _uuid.v4();
-      // Still use firestore service to upload the image
-      final imageUrl = await _firestoreService.uploadImage(widget.imageBytes, analysisId);
+      const String imageUrl = "";
+
       final topPrediction = widget.analysisResult.prediction;
 
-      final analysisToSave = AnalysisResult(
-        id: analysisId,
-        userId: user.uid,
-        disease: topPrediction.className,
-        probability: double.tryParse(topPrediction.confidence.replaceAll('%', '')) ?? 0.0,
-        recommendation: "Consult a dermatologist for a professional opinion.",
-        imageUrl: imageUrl,
-        timestamp: DateTime.now(),
-      );
+      // This data structure is compatible with Firestore, which can handle Timestamps.
+      final Map<String, dynamic> dataToSave = {
+        'imagePath': imageUrl, 
+        'scanResult': {
+          'prediction': {
+            'className': topPrediction.className,
+            'confidence': topPrediction.confidence,
+            'confidenceScore': widget.analysisResult.details.first.probability / 100,
+          },
+          'status': 'success',
+          'timestamp': Timestamp.now(), // Firestore handles this object type correctly.
+          'userId': user.uid,
+          'details': widget.analysisResult.details.map((e) => e.toJson()).toList(),
+        },
+      };
+      
+      // The actual call to save the data to Firestore.
+      await _firestoreService.saveRawAnalysisResult(analysisId, dataToSave);
 
-      // Save to Realtime Database
-      await _rtdbService.saveAnalysisResult(analysisToSave);
+      developer.log('Successfully saved analysis with ID: $analysisId', name: logName);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Successfully saved to history.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        setState(() {
+          _isSaved = true;
+        });
       }
-
-    } catch (e) {
+    } catch (e, s) {
+      developer.log(
+        'Failed to save analysis to history.',
+        name: logName,
+        level: 1000, // SEVERE
+        error: e,
+        stackTrace: s,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -90,6 +104,7 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
       }
     }
   }
+
 
   Image _imageFromBytes(Uint8List bytes) {
     return Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true);
@@ -106,7 +121,8 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
         ),
         title: Text(
           'Analysis Results',
-          style: GoogleFonts.manrope(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 18),
+          style: GoogleFonts.manrope(
+              fontWeight: FontWeight.bold, color: Colors.black, fontSize: 18),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -143,13 +159,19 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
           children: [
             Text(
               'Top Diagnosis',
-              style: GoogleFonts.manrope(fontSize: 16, color: Colors.grey[600], fontWeight: FontWeight.w600),
+              style: GoogleFonts.manrope(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
             Text(
               prediction.className,
               textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(fontSize: 26, fontWeight: FontWeight.bold, color: const Color(0xFF18A0FB)),
+              style: GoogleFonts.manrope(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF18A0FB)),
             ),
             const SizedBox(height: 16),
             Row(
@@ -157,11 +179,15 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
               children: [
                 Text(
                   'Confidence Level: ',
-                  style: GoogleFonts.manrope(fontSize: 16, color: Colors.grey[800]),
+                  style: GoogleFonts.manrope(
+                      fontSize: 16, color: Colors.grey[800]),
                 ),
                 Text(
                   prediction.confidence,
-                  style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                  style: GoogleFonts.manrope(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87),
                 ),
               ],
             ),
@@ -171,14 +197,19 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
     );
   }
 
-  Widget _buildImageComparisonCard(Uint8List originalBytes, Uint8List heatmapBytes) {
+  Widget _buildImageComparisonCard(
+      Uint8List originalBytes, Uint8List heatmapBytes) {
     return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            Text("Original Image", style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text("AI Focus Area", style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text("Original Image",
+                style: GoogleFonts.manrope(
+                    fontWeight: FontWeight.bold, fontSize: 16)),
+            Text("AI Focus Area",
+                style: GoogleFonts.manrope(
+                    fontWeight: FontWeight.bold, fontSize: 16)),
           ],
         ),
         const SizedBox(height: 12),
@@ -200,7 +231,8 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
         child: Card(
           elevation: 2,
           shadowColor: Colors.grey.withOpacity(0.1),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           clipBehavior: Clip.antiAlias,
           child: _imageFromBytes(imageBytes),
         ),
@@ -216,7 +248,7 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
   }
 
   Widget _buildBreakdownCard(List<DiseaseDetail> details) {
-     return Card(
+    return Card(
       elevation: 2,
       shadowColor: Colors.grey.withOpacity(0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -227,10 +259,13 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
           children: [
             Text(
               'Full Analysis Breakdown',
-              style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+              style: GoogleFonts.manrope(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.black87),
             ),
             const SizedBox(height: 16),
-            ...details.map((detail) => _buildProbabilityBar(detail)).toList(),
+            ...details.map((detail) => _buildProbabilityBar(detail)),
           ],
         ),
       ),
@@ -238,7 +273,8 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
   }
 
   Widget _buildProbabilityBar(DiseaseDetail detail) {
-    final isTopMatch = detail.probability == widget.analysisResult.details.first.probability;
+    final isTopMatch =
+        detail.probability == widget.analysisResult.details.first.probability;
     final color = isTopMatch ? const Color(0xFF18A0FB) : Colors.grey[400];
 
     return Padding(
@@ -252,13 +288,20 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
               Flexible(
                 child: Text(
                   detail.disease,
-                  style: GoogleFonts.manrope(fontWeight: isTopMatch ? FontWeight.bold : FontWeight.normal, fontSize: 15),
+                  style: GoogleFonts.manrope(
+                      fontWeight:
+                          isTopMatch ? FontWeight.bold : FontWeight.normal,
+                      fontSize: 15),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               Text(
                 '${(detail.probability).toStringAsFixed(2)}%',
-                style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 15, color: isTopMatch ? const Color(0xFF18A0FB) : Colors.black87),
+                style: GoogleFonts.manrope(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color:
+                        isTopMatch ? const Color(0xFF18A0FB) : Colors.black87),
               ),
             ],
           ),
@@ -301,29 +344,45 @@ class _AnalysisResultsScreenState extends State<AnalysisResultsScreen> {
   Widget _buildActionButtons(BuildContext context) {
     return Column(
       children: [
+        if (_isSaved)
+          Card(
+            color: Colors.green.shade50,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 0,
+            child: const ListTile(
+              leading: Icon(Icons.check_circle, color: Colors.green),
+              title: Text('Saved to history'),
+            ),
+          ),
+        const SizedBox(height: 12),
         ElevatedButton.icon(
-          onPressed: () => context.go('/consult'),
-          icon: const Icon(Icons.person_search_outlined, color: Colors.white),
-          label: const Text('Find a Specialist Nearby'),
+          onPressed: () => context.go('/history'),
+          icon: const Icon(Icons.history, color: Colors.white),
+          label: const Text('View History'),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF18A0FB),
             foregroundColor: Colors.white,
             minimumSize: const Size(double.infinity, 55),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            textStyle: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            textStyle:
+                GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16),
           ),
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
-          onPressed: () => context.push('/model_performance'),
-          icon: const Icon(Icons.bar_chart_outlined),
-          label: const Text('How Our AI Model Works'),
+          onPressed: () => context.go('/scan'),
+          icon: const Icon(Icons.camera_alt_outlined),
+          label: const Text('Scan Again'),
           style: OutlinedButton.styleFrom(
             foregroundColor: const Color(0xFF18A0FB),
             side: const BorderSide(color: Color(0xFF18A0FB)),
             minimumSize: const Size(double.infinity, 50),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            textStyle: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            textStyle:
+                GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16),
           ),
         ),
       ],

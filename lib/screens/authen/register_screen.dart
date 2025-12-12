@@ -34,7 +34,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: _emailController.text,
         password: _passwordController.text,
       );
-      // Navigate to home on success
+      
+      if (!mounted) return;
+      
       context.go('/home');
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -51,90 +53,92 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 450),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Spacer(),
-                  CircleAvatar(
-                    radius: 40.0,
-                    backgroundColor: const Color(0xFF18A0FB).withOpacity(0.2),
-                    child: const Icon(
-                      Icons.security,
-                      color: Color(0xFF18A0FB),
-                      size: 40.0,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 32),
+                    CircleAvatar(
+                      radius: 40.0,
+                      backgroundColor: const Color(0xFF18A0FB).withOpacity(0.2),
+                      child: const Icon(
+                        Icons.person_add_alt_1_outlined,
+                        color: Color(0xFF18A0FB),
+                        size: 40.0,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Tạo tài khoản',
-                    style: GoogleFonts.manrope(
-                      fontSize: 28.0,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF212529),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  _buildTextField(
-                    controller: _emailController,
-                    hintText: 'Email',
-                    prefixIcon: Icons.email_outlined,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildPasswordField(
-                    controller: _passwordController,
-                    hintText: 'Mật khẩu',
-                    obscureText: _obscurePassword,
-                    onToggleVisibility: () {
-                      setState(() {
-                        _obscurePassword = !_obscurePassword;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _buildPasswordField(
-                    controller: _confirmPasswordController,
-                    hintText: 'Nhập lại mật khẩu',
-                    obscureText: _obscureConfirmPassword,
-                    onToggleVisibility: () {
-                      setState(() {
-                        _obscureConfirmPassword = !_obscureConfirmPassword;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  if (_errorMessage.isNotEmpty)
+                    const SizedBox(height: 24),
                     Text(
-                      _errorMessage,
-                      style: const TextStyle(color: Colors.red, fontSize: 14),
-                    ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _register,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF18A0FB),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: Text(
-                        'Đăng ký',
-                        style: GoogleFonts.manrope(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                      'Tạo tài khoản',
+                      style: GoogleFonts.manrope(
+                        fontSize: 28.0,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF212529),
                       ),
                     ),
-                  ),
-                  const Spacer(),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 32.0),
-                    child: RichText(
+                    const SizedBox(height: 32),
+                    _buildTextField(
+                      controller: _emailController,
+                      hintText: 'Email',
+                      prefixIcon: Icons.email_outlined,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildPasswordField(
+                      controller: _passwordController,
+                      hintText: 'Mật khẩu',
+                      obscureText: _obscurePassword,
+                      onToggleVisibility: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    _buildPasswordField(
+                      controller: _confirmPasswordController,
+                      hintText: 'Nhập lại mật khẩu',
+                      obscureText: _obscureConfirmPassword,
+                      onToggleVisibility: () {
+                        setState(() {
+                          _obscureConfirmPassword = !_obscureConfirmPassword;
+                        });
+                      },
+                    ),
+                    if (_errorMessage.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 24.0, bottom: 8.0),
+                        child: Text(
+                          _errorMessage,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.red, fontSize: 14),
+                        ),
+                      ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _register,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF18A0FB),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: Text(
+                          'Đăng ký',
+                          style: GoogleFonts.manrope(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 48),
+                    RichText(
                       text: TextSpan(
                         style: GoogleFonts.manrope(
                           fontSize: 14,
@@ -154,8 +158,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ],
                       ),
                     ),
-                  )
-                ],
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
             ),
           ),

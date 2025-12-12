@@ -69,7 +69,8 @@ class ResponsiveScaffold extends StatelessWidget {
                 NavigationRail(
                   selectedIndex: selectedIndex,
                   onDestinationSelected: (index) => _onItemTapped(index, context),
-                  labelType: NavigationRailLabelType.all,
+                  // FIX: Changed from .all to .selected to prevent overflow on smaller heights
+                  labelType: NavigationRailLabelType.selected, 
                   destinations: destinations.map((item) => NavigationRailDestination(
                     icon: item.icon,
                     selectedIcon: item.activeIcon,

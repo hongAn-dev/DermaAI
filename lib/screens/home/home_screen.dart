@@ -1,33 +1,24 @@
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:myapp/screens/responsive_scaffold.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final String displayName = user?.displayName ?? 'Jane';
+  State<HomeScreen> createState() => _HomeScreenState();
+}
 
-    // Dummy data for recent analyses
-    final List<Map<String, dynamic>> recentAnalysesData = [
-      {
-        'status': 'Low Risk',
-        'statusColor': Colors.green,
-        'date': 'Sep 20, 2023',
-        'imageUrl': 'https://firebasestorage.googleapis.com/v0/b/skindiseasedetection-623ae.appspot.com/o/resources%2Fnevus_example.jpg?alt=media&token=40463390-3606-4767-91d4-850935535569',
-      },
-      {
-        'status': 'Monitor',
-        'statusColor': Colors.orange,
-        'date': 'Sep 18, 2023',
-        'imageUrl': 'https://firebasestorage.googleapis.com/v0/b/skindiseasedetection-623ae.appspot.com/o/resources%2Fmelanoma_example.jpg?alt=media&token=9d39294e-da89-4113-a75d-639db5481e18',
-      },
-    ];
+class _HomeScreenState extends State<HomeScreen> {
+  final User? user = FirebaseAuth.instance.currentUser;
+
+  @override
+  Widget build(BuildContext context) {
+    final String displayName = user?.displayName ?? 'Jane';
 
     return ResponsiveScaffold(
       selectedIndex: 0,
@@ -43,12 +34,15 @@ class HomeScreen extends StatelessWidget {
                 _buildHeader(displayName),
                 const SizedBox(height: 32),
 
+                // --- Recent History Section ---
+                _buildRecentHistory(context),
+                const SizedBox(height: 32),
+
                 // --- Responsive Layout for Cards ---
                 LayoutBuilder(
                   builder: (context, constraints) {
                     bool isWideScreen = constraints.maxWidth > 768;
                     if (isWideScreen) {
-                      // --- Web Layout ---
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -62,19 +56,14 @@ class HomeScreen extends StatelessWidget {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 32),
-                          _buildRecentAnalysesSection(context, recentAnalysesData, isWideScreen: true),
                         ],
                       );
                     } else {
-                      // --- Mobile Layout ---
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildAnalysisCard(context),
-                          const SizedBox(height: 32),
-                          _buildRecentAnalysesSection(context, recentAnalysesData, isWideScreen: false),
-                          const SizedBox(height: 32),
+                          const SizedBox(height: 24),
                           _buildConsultCard(context),
                         ],
                       );
@@ -106,6 +95,114 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildRecentHistory(BuildContext context) {
+    if (user == null) return const SizedBox.shrink();
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('scan_history')
+          .where('scanResult.userId', isEqualTo: user!.uid)
+          // NOTE: The orderBy clause is added back, assuming the index is now enabled.
+          // If errors persist, this is the first place to check.
+          .orderBy('scanResult.timestamp', descending: true)
+          .limit(3)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          // If there is no history, don't show anything on the home screen.
+          return const SizedBox.shrink();
+        }
+
+        final docs = snapshot.data!.docs;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Recent Activity',
+                  style: GoogleFonts.manrope(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                TextButton(
+                  onPressed: () => context.go('/history'),
+                  child: Text('View All', style: GoogleFonts.manrope(color: const Color(0xFF18A0FB), fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: docs.length,
+              itemBuilder: (context, index) {
+                return _buildHistoryTile(docs[index]);
+              },
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildHistoryTile(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final scanResultData = data['scanResult'] as Map<String, dynamic>?;
+    final predictionData = scanResultData?['prediction'] as Map<String, dynamic>?;
+    final predictionText = predictionData?['className'] as String? ?? 'N/A';
+    final timestamp = (scanResultData?['timestamp'] as Timestamp?)?.toDate();
+    final statusColor = predictionText.toLowerCase().contains('malignant')
+        ? Colors.red.shade400
+        : Colors.green.shade400;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            spreadRadius: 1,
+            blurRadius: 10,
+          )
+        ]
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.history, color: Colors.grey[600]),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  predictionText,
+                  style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 4),
+                 Text(
+                  timestamp != null
+                      ? DateFormat.yMMMd().add_jm().format(timestamp)
+                      : 'No date',
+                  style: GoogleFonts.manrope(color: Colors.grey[600], fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Icon(Icons.circle, color: statusColor, size: 14),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAnalysisCard(BuildContext context) {
     return Card(
       color: const Color(0xFFE3F6FF),
@@ -115,23 +212,28 @@ class HomeScreen extends StatelessWidget {
         padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const CircleAvatar(
-              backgroundColor: Color(0xFF18A0FB),
-              child: Icon(Icons.search, color: Colors.white),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                 const CircleAvatar(
+                  backgroundColor: Color(0xFF18A0FB),
+                  child: Icon(Icons.search, color: Colors.white),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Start New Skin Analysis',
+                  style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Get an AI-powered skin check in seconds. Upload a photo to get started.',
+                  style: GoogleFonts.manrope(fontSize: 14, color: Colors.black54, height: 1.5),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Start New Skin Analysis',
-              style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Get an AI-powered skin check in seconds. Upload a photo to get started.',
-              style: GoogleFonts.manrope(fontSize: 14, color: Colors.black54, height: 1.5),
-            ),
-            const Spacer(), // This is now safe to use
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () => context.go('/scan'),
               style: ElevatedButton.styleFrom(
@@ -154,71 +256,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRecentAnalysesSection(BuildContext context, List<Map<String, dynamic>> data, {required bool isWideScreen}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Your Recent Analyses',
-          style: GoogleFonts.manrope(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 16),
-        isWideScreen
-            ? Row(
-                children: data.map((item) => Expanded(child: _buildRecentAnalysisItem(item))).toList().expand((widget) => [widget, const SizedBox(width: 20)]).toList()..removeLast(),
-              )
-            : Column(
-                children: data.map((item) => _buildRecentAnalysisItem(item)).toList().expand((widget) => [widget, const SizedBox(height: 16)]).toList()..removeLast(),
-              ),
-      ],
-    );
-  }
-
-  Widget _buildRecentAnalysisItem(Map<String, dynamic> data) {
-    return Card(
-      elevation: 1,
-      shadowColor: Colors.grey.withOpacity(0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AspectRatio(
-              aspectRatio: 16 / 10,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  image: DecorationImage(
-                    image: NetworkImage(data['imageUrl']!),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: data['statusColor'],
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(data['status'], style: GoogleFonts.manrope(fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(data['date'], style: GoogleFonts.manrope(color: Colors.grey, fontSize: 12)),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildConsultCard(BuildContext context) {
     return Card(
       color: Colors.grey[200],
@@ -228,17 +265,22 @@ class HomeScreen extends StatelessWidget {
         padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-             const CircleAvatar(
-              backgroundColor: Colors.black87,
-              child: Icon(Icons.person_search_outlined, color: Colors.white),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                 const CircleAvatar(
+                  backgroundColor: Colors.black87,
+                  child: Icon(Icons.person_search_outlined, color: Colors.white),
+                ),
+                const SizedBox(height: 16),
+                Text('Consult a Dermatologist', style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text('Want a professional opinion? Find a certified dermatologist near you.', style: GoogleFonts.manrope(height: 1.5)),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text('Consult a Dermatologist', style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text('Want a professional opinion? Find a certified dermatologist near you.', style: GoogleFonts.manrope(height: 1.5)),
-            const Spacer(), // This is now safe to use
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () => context.go('/consult'),
               style: ElevatedButton.styleFrom(

@@ -38,7 +38,7 @@ class TermsOfServiceScreen extends StatelessWidget {
               initiallyExpanded: true,
             ),
              _buildExpansionTile('Intellectual Property', 'All content and software associated with this application are the property of DermAI Inc. or its licensors...'),
-            _buildExpansionTile('Disclaimer of Warranties', 'The service is provided \"as is\" without any warranties of any kind, either express or implied...'),
+            _buildExpansionTile('Disclaimer of Warranties', 'The service is provided "as is" without any warranties of any kind, either express or implied...'),
             _buildExpansionTile('Limitation of Liability', 'DermAI Inc. shall not be liable for any indirect, incidental, special, consequential or punitive damages...'),
             _buildExpansionTile('Contact Information', 'If you have any questions about these Terms, please contact us at contact@dermai.app.'),
           ],

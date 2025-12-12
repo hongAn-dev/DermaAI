@@ -89,7 +89,7 @@ class ConsultPage extends StatelessWidget {
             const SizedBox(height: 16),
             _buildFilterChips(),
             const SizedBox(height: 24),
-            ...ConsultScreen.doctors.map((doctor) => _buildDoctorCard(doctor)).toList(),
+            ...ConsultScreen.doctors.map((doctor) => _buildDoctorCard(doctor)),
           ],
         ),
       ),

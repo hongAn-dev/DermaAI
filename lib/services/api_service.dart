@@ -2,93 +2,46 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-// --- Data Models for JSON Response ---
-
-class AnalysisResponse {
-  final String status;
-  final Prediction prediction;
-  final List<DiseaseDetail> details;
-  final String heatmapImage; // Base64 encoded string
-
-  AnalysisResponse({
-    required this.status,
-    required this.prediction,
-    required this.details,
-    required this.heatmapImage,
-  });
-
-  factory AnalysisResponse.fromJson(Map<String, dynamic> json) {
-    var detailsList = json['details'] as List;
-    List<DiseaseDetail> diseaseDetails = detailsList.map((i) => DiseaseDetail.fromJson(i)).toList();
-
-    return AnalysisResponse(
-      status: json['status'],
-      prediction: Prediction.fromJson(json['prediction']),
-      details: diseaseDetails,
-      heatmapImage: json['heatmap_image'],
-    );
-  }
-}
-
-class Prediction {
-  final String className;
-  final String confidence;
-  final double confidenceScore;
-
-  Prediction({
-    required this.className,
-    required this.confidence,
-    required this.confidenceScore,
-  });
-
-  factory Prediction.fromJson(Map<String, dynamic> json) {
-    return Prediction(
-      className: json['class'],
-      confidence: json['confidence'],
-      confidenceScore: json['confidence_score'].toDouble(),
-    );
-  }
-}
-
-class DiseaseDetail {
-  final String disease;
-  final double probability;
-  final double score;
-
-  DiseaseDetail({
-    required this.disease,
-    required this.probability,
-    required this.score,
-  });
-
-  factory DiseaseDetail.fromJson(Map<String, dynamic> json) {
-    return DiseaseDetail(
-      disease: json['disease'],
-      probability: json['probability'].toDouble(),
-      score: json['score'].toDouble(),
-    );
-  }
-}
+// Import the centralized data models instead of defining them here
+import 'package:myapp/models/analysis_model.dart';
 
 // --- API Service Class ---
 
 class ApiService {
+  // NOTE: This Ngrok URL is temporary. For production, you should use a permanent server URL.
   static const String _baseUrl = 'https://nannette-suppositious-brayan.ngrok-free.dev';
 
+  /// Analyzes an image by sending it to the backend server.
+  ///
+  /// The [imageFile] is sent as a multipart request to the /explain endpoint.
+  /// It returns an [AnalysisResponse] object if successful, otherwise null.
   Future<AnalysisResponse?> analyzeImage(XFile imageFile) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      // Throwing an exception is better for handling this case in the UI.
+      throw Exception("User is not authenticated. Cannot analyze image.");
+    }
+    final userId = user.uid;
+
     final uri = Uri.parse('$_baseUrl/explain');
     final request = http.MultipartRequest('POST', uri);
 
-    // Read the file as a byte stream to support both web and mobile
     final imageBytes = await imageFile.readAsBytes();
+    
+    // Create a unique filename for the image to avoid potential conflicts.
+    final imageName = '${DateTime.now().millisecondsSinceEpoch}_${imageFile.name}';
+
     final multipartFile = http.MultipartFile.fromBytes(
-      'file', // This is the field name the server expects
+      'file', 
       imageBytes,
-      filename: imageFile.name, // Pass the original filename
+      filename: imageName,
     );
 
     request.files.add(multipartFile);
+    // You can add more fields to the request if your backend needs them, e.g.:
+    // request.fields['userId'] = userId;
 
     try {
       final response = await request.send();
@@ -96,16 +49,17 @@ class ApiService {
       if (response.statusCode == 200) {
         final responseBody = await response.stream.bytesToString();
         final decodedJson = jsonDecode(responseBody);
+        // Now uses the model from analysis_model.dart
         return AnalysisResponse.fromJson(decodedJson);
       } else {
         final errorBody = await response.stream.bytesToString();
-        print('Error: Server returned status code ${response.statusCode}');
-        print('Error body: $errorBody');
-        return null;
+        // Providing more specific error information is helpful for debugging.
+        throw Exception('Server Error ${response.statusCode}: $errorBody');
       }
     } catch (e) {
-      print('Error sending request: $e');
-      return null;
+      // Log the error and re-throw to allow the UI to handle it.
+      print('Error in analyzeImage: $e');
+      rethrow;
     }
   }
 }
