@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:myapp/utils/color_utils.dart';
 import 'package:intl/intl.dart';
 import 'package:myapp/screens/responsive_scaffold.dart';
 import 'dart:developer' as developer;
@@ -15,7 +16,6 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-
   Map<String, List<QueryDocumentSnapshot>> _groupAnalysesByMonth(
       List<QueryDocumentSnapshot> docs) {
     final Map<String, List<QueryDocumentSnapshot>> grouped = {};
@@ -23,8 +23,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
     docs.sort((a, b) {
       final aData = a.data() as Map<String, dynamic>?;
       final bData = b.data() as Map<String, dynamic>?;
-      final aTimestamp = (aData?['scanResult']?['timestamp'] as Timestamp?)?.toDate() ?? DateTime(1970);
-      final bTimestamp = (bData?['scanResult']?['timestamp'] as Timestamp?)?.toDate() ?? DateTime(1970);
+      final aTimestamp =
+          (aData?['scanResult']?['timestamp'] as Timestamp?)?.toDate() ??
+              DateTime(1970);
+      final bTimestamp =
+          (bData?['scanResult']?['timestamp'] as Timestamp?)?.toDate() ??
+              DateTime(1970);
       return bTimestamp.compareTo(aTimestamp); // Descending order
     });
 
@@ -49,7 +53,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user != null) {
-      developer.log("DEBUG: Current User ID in History Screen: ${user.uid}", name: 'history.screen');
+      developer.log("DEBUG: Current User ID in History Screen: ${user.uid}",
+          name: 'history.screen');
     } else {
       developer.log("DEBUG: User is not logged in.", name: 'history.screen');
     }
@@ -80,11 +85,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (snapshot.hasError) {
-                    developer.log("Firestore Stream Error", name: 'history.screen', error: snapshot.error, stackTrace: snapshot.stackTrace);
-                    return Center(child: Text("An error occurred: ${snapshot.error}"));
+                    developer.log("Firestore Stream Error",
+                        name: 'history.screen',
+                        error: snapshot.error,
+                        stackTrace: snapshot.stackTrace);
+                    return Center(
+                        child: Text("An error occurred: ${snapshot.error}"));
                   }
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                     developer.log("Stream has no data or is empty.", name: 'history.screen');
+                    developer.log("Stream has no data or is empty.",
+                        name: 'history.screen');
                     return _buildEmptyState();
                   }
 
@@ -111,11 +121,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.history_toggle_off_outlined, size: 80, color: Colors.grey),
+          const Icon(Icons.history_toggle_off_outlined,
+              size: 80, color: Colors.grey),
           const SizedBox(height: 20),
           Text(
             'No History Yet',
-            style: GoogleFonts.manrope(fontSize: 22, fontWeight: FontWeight.bold),
+            style:
+                GoogleFonts.manrope(fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
           Text(
@@ -123,18 +135,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
             textAlign: TextAlign.center,
             style: GoogleFonts.manrope(fontSize: 16, color: Colors.grey[600]),
           ),
-           const SizedBox(height: 30),
-            ElevatedButton.icon(
-              onPressed: () => context.go('/scan'),
-              icon: const Icon(Icons.document_scanner_outlined, color: Colors.white),
-              label: const Text('Start First Scan'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF18A0FB),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
+          const SizedBox(height: 30),
+          ElevatedButton.icon(
+            onPressed: () => context.go('/scan'),
+            icon: const Icon(Icons.document_scanner_outlined,
+                color: Colors.white),
+            label: const Text('Start First Scan'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF18A0FB),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
+          ),
         ],
       ),
     );
@@ -167,21 +181,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final data = doc.data() as Map<String, dynamic>;
 
     final scanResultData = data['scanResult'] as Map<String, dynamic>?;
-    final predictionData = scanResultData?['prediction'] as Map<String, dynamic>?;
-    final predictionText = predictionData?['className'] as String? ?? 'Analysis result not available.';
+    final predictionData =
+        scanResultData?['prediction'] as Map<String, dynamic>?;
+    final predictionText = predictionData?['className'] as String? ??
+        'Analysis result not available.';
     final confidenceScore = predictionData?['confidenceScore'] as num? ?? 0.0;
 
     final timestamp = (scanResultData?['timestamp'] as Timestamp?)?.toDate();
 
-    final statusColor = predictionText.toLowerCase().contains('malignant') 
-      ? Colors.red.shade700 
-      : Colors.green.shade700;
+    final statusColor = predictionText.toLowerCase().contains('malignant')
+        ? Colors.red.shade700
+        : Colors.green.shade700;
 
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      shadowColor: Colors.grey.withOpacity(0.1),
+      shadowColor: colorWithOpacity(Colors.grey, 0.1),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Row(
@@ -203,7 +219,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   const SizedBox(height: 4),
                   Text(
                     'Confidence: ${(confidenceScore * 100).toStringAsFixed(1)}%',
-                     style: GoogleFonts.manrope(fontSize: 14, color: Colors.grey[700]),
+                    style: GoogleFonts.manrope(
+                        fontSize: 14, color: Colors.grey[700]),
                   ),
                 ],
               ),

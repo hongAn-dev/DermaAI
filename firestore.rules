@@ -7,6 +7,11 @@ service cloud.firestore {
       allow read, update, create: if request.auth != null && request.auth.uid == userId;
     }
 
+    // Allow users to create/update their canonical user document used by the app
+    match /users/{uid} {
+      allow create, read, update: if request.auth != null && request.auth.uid == uid;
+    }
+
     // Scan history documents
     match /scan_history/{scanId} {
       // Allow create if the user is authenticated and the new document's

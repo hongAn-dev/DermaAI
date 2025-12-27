@@ -1,12 +1,13 @@
-
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:myapp/utils/color_utils.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/models/analysis_model.dart';
 import 'package:myapp/services/api_service.dart';
 import 'package:myapp/screens/scan/analysis_results_screen.dart';
+import 'package:myapp/utils/responsive.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -56,7 +57,7 @@ class _ScanScreenState extends State<ScanScreen> {
     });
 
     try {
-      final AnalysisResponse? result = await _apiService.analyzeImage(_image!); 
+      final AnalysisResponse? result = await _apiService.analyzeImage(_image!);
       if (!mounted) return;
 
       if (result != null) {
@@ -70,8 +71,9 @@ class _ScanScreenState extends State<ScanScreen> {
           ),
         );
       } else {
-         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Analysis failed. No result was returned.')),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Analysis failed. No result was returned.')),
         );
       }
     } catch (e) {
@@ -102,13 +104,17 @@ class _ScanScreenState extends State<ScanScreen> {
         title: Text(
           'New Analysis',
           style: GoogleFonts.manrope(
-              fontWeight: FontWeight.bold, color: Colors.black, fontSize: 18),
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+              fontSize: Responsive.fontSize(context, 18)),
         ),
         centerTitle: true,
         backgroundColor: const Color(0xFFF8F9FA),
         elevation: 0,
       ),
-      body: _imageBytes == null ? _buildSelectionScreen() : _buildAnalysisScreen(),
+      body: _imageBytes == null
+          ? _buildSelectionScreen()
+          : _buildAnalysisScreen(),
     );
   }
 
@@ -117,47 +123,50 @@ class _ScanScreenState extends State<ScanScreen> {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        padding:
+            EdgeInsets.symmetric(horizontal: Responsive.scale(context, 24.0)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 20),
+            SizedBox(height: Responsive.scale(context, 20)),
             Text(
               'Analyze Your Skin',
               style: GoogleFonts.manrope(
-                fontSize: 28,
+                fontSize: Responsive.fontSize(context, 28),
                 fontWeight: FontWeight.bold,
                 color: const Color(0xFF212529),
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: Responsive.scale(context, 8)),
             Text(
               'Upload a clear, well-lit photo of the skin area for an AI-powered analysis.',
               style: GoogleFonts.manrope(
-                fontSize: 16,
+                fontSize: Responsive.fontSize(context, 16),
                 color: const Color(0xFF6C757D),
               ),
             ),
-            const SizedBox(height: 40),
+            SizedBox(height: Responsive.scale(context, 40)),
             _buildOptionCard(
               icon: Icons.camera_alt_outlined,
               label: 'Take a photo',
               onTap: () => _pickImage(ImageSource.camera),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: Responsive.scale(context, 20)),
             _buildOptionCard(
               icon: Icons.photo_library_outlined,
               label: 'Upload from Gallery',
               onTap: () => _pickImage(ImageSource.gallery),
             ),
-            const SizedBox(height: 60), // Replaced Spacer with a flexible SizedBox
+            SizedBox(
+                height: Responsive.scale(
+                    context, 60)), // Replaced Spacer with a flexible SizedBox
             Padding(
-              padding: const EdgeInsets.only(bottom: 24.0),
+              padding: EdgeInsets.only(bottom: Responsive.scale(context, 24.0)),
               child: Text(
                 'This AI analysis is not a substitute for professional medical advice. Always consult a healthcare provider.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.manrope(
-                  fontSize: 12,
+                  fontSize: Responsive.fontSize(context, 12),
                   color: const Color(0xFF6C757D),
                 ),
               ),
@@ -177,20 +186,25 @@ class _ScanScreenState extends State<ScanScreen> {
       onTap: onTap,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 32),
+        padding: EdgeInsets.symmetric(vertical: Responsive.scale(context, 32)),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), spreadRadius: 1, blurRadius: 10)],
+          borderRadius: BorderRadius.circular(Responsive.scale(context, 20)),
+          boxShadow: [
+            BoxShadow(
+                color: colorWithOpacity(Colors.grey, 0.1),
+                spreadRadius: 1,
+                blurRadius: 10)
+          ],
         ),
         child: Column(
           children: [
-            Icon(icon, size: 48, color: iconColor),
-            const SizedBox(height: 16),
+            Icon(icon, size: Responsive.scale(context, 48), color: iconColor),
+            SizedBox(height: Responsive.scale(context, 16)),
             Text(
               label,
               style: GoogleFonts.manrope(
-                fontSize: 18,
+                fontSize: Responsive.fontSize(context, 18),
                 fontWeight: FontWeight.bold,
                 color: const Color(0xFF212529),
               ),
@@ -203,24 +217,28 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Widget _buildAnalysisScreen() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
+      padding: EdgeInsets.all(Responsive.scale(context, 24.0)),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
           Text(
             'Your Photo',
-            style: GoogleFonts.manrope(fontSize: 22, fontWeight: FontWeight.bold, color: const Color(0xFF212529)),
+            style: GoogleFonts.manrope(
+                fontSize: Responsive.fontSize(context, 22),
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF212529)),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: Responsive.scale(context, 20)),
           if (_imageBytes != null)
             ClipRRect(
-              borderRadius: BorderRadius.circular(16.0),
+              borderRadius:
+                  BorderRadius.circular(Responsive.scale(context, 16.0)),
               child: Image.memory(
                 _imageBytes!,
                 fit: BoxFit.cover,
               ),
             ),
-          const SizedBox(height: 30),
+          SizedBox(height: Responsive.scale(context, 30)),
           if (_isAnalyzing)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 16.0),
@@ -233,16 +251,21 @@ class _ScanScreenState extends State<ScanScreen> {
                 icon: const Icon(Icons.analytics_outlined, color: Colors.white),
                 onPressed: _analyzeImage,
                 label: const Text('Analyze Image'),
-                 style: ElevatedButton.styleFrom(
+                style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF18A0FB),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  padding: EdgeInsets.symmetric(
+                      vertical: Responsive.scale(context, 16)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(Responsive.scale(context, 12))),
+                  textStyle: TextStyle(
+                      fontSize: Responsive.fontSize(context, 16),
+                      fontWeight: FontWeight.bold),
                 ),
               ),
             ),
-          const SizedBox(height: 10),
+          SizedBox(height: Responsive.scale(context, 10)),
           SizedBox(
             width: double.infinity,
             child: TextButton.icon(

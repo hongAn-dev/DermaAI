@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:myapp/utils/color_utils.dart';
+import 'package:myapp/utils/responsive.dart';
 
 class ModelPerformanceScreen extends StatelessWidget {
   const ModelPerformanceScreen({super.key});
@@ -17,28 +19,37 @@ class ModelPerformanceScreen extends StatelessWidget {
           ),
           title: Text(
             'Model Performance',
-            style: GoogleFonts.manrope(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 18),
+            style: GoogleFonts.manrope(
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+                fontSize: Responsive.fontSize(context, 18)),
           ),
           backgroundColor: Colors.transparent,
           elevation: 0,
           centerTitle: true,
         ),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(Responsive.scale(context, 16.0)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildMetricsGrid(),
-              const SizedBox(height: 24),
+              _buildMetricsGrid(context),
+              SizedBox(height: Responsive.scale(context, 24)),
               _buildInfoCard(
+                context,
                 title: 'Confusion Matrix',
-                subtitle: 'Performance of the classification model on the test dataset.',
+                subtitle:
+                    'Performance of the classification model on the test dataset.',
                 // Placeholder image for the confusion matrix
-                child: Image.network('https://firebasestorage.googleapis.com/v0/b/project-id-dev-b2d9b.appspot.com/o/confusion_matrix.png?alt=media&token=8d23d8f1-8f2c-4b7e-8b9a-4e2b0d71f6d3'),
+                child: Image.network(
+                    'https://firebasestorage.googleapis.com/v0/b/project-id-dev-b2d9b.appspot.com/o/confusion_matrix.png?alt=media&token=8d23d8f1-8f2c-4b7e-8b9a-4e2b0d71f6d3'),
               ),
-              const SizedBox(height: 24),
-              Text('Training Progress', style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 18)),
-              const SizedBox(height: 12),
+              SizedBox(height: Responsive.scale(context, 24)),
+              Text('Training Progress',
+                  style: GoogleFonts.manrope(
+                      fontWeight: FontWeight.bold,
+                      fontSize: Responsive.fontSize(context, 18))),
+              SizedBox(height: Responsive.scale(context, 12)),
               TabBar(
                 labelColor: const Color(0xFF18A0FB),
                 unselectedLabelColor: Colors.grey[600],
@@ -48,19 +59,23 @@ class ModelPerformanceScreen extends StatelessWidget {
                   Tab(text: 'Validation'),
                 ],
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: Responsive.scale(context, 16)),
               _buildInfoCard(
+                context,
                 title: 'Accuracy Over Epochs',
                 subtitle: 'Model accuracy improvement during training.',
-                 // Placeholder image for the accuracy graph
-                child: Image.network('https://firebasestorage.googleapis.com/v0/b/project-id-dev-b2d9b.appspot.com/o/accuracy_graph.png?alt=media&token=2d4778d4-2092-4217-8e6c-38f375f0a6d1'),
+                // Placeholder image for the accuracy graph
+                child: Image.network(
+                    'https://firebasestorage.googleapis.com/v0/b/project-id-dev-b2d9b.appspot.com/o/accuracy_graph.png?alt=media&token=2d4778d4-2092-4217-8e6c-38f375f0a6d1'),
               ),
-              const SizedBox(height: 16),
-               _buildInfoCard(
+              SizedBox(height: Responsive.scale(context, 16)),
+              _buildInfoCard(
+                context,
                 title: 'Loss Over Epochs',
                 subtitle: 'Model loss reduction during training.',
                 // Placeholder image for the loss graph
-                child: Image.network('https://firebasestorage.googleapis.com/v0/b/project-id-dev-b2d9b.appspot.com/o/loss_graph.png?alt=media&token=92e31573-fe84-4a4b-9d41-32a26569f195'),
+                child: Image.network(
+                    'https://firebasestorage.googleapis.com/v0/b/project-id-dev-b2d9b.appspot.com/o/loss_graph.png?alt=media&token=92e31573-fe84-4a4b-9d41-32a26569f195'),
               ),
             ],
           ),
@@ -69,30 +84,39 @@ class ModelPerformanceScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMetricsGrid() {
+  Widget _buildMetricsGrid(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        _buildMetricCard('Overall Accuracy', '95.2%'),
-        _buildMetricCard('Precision', '94.8%'),
-        _buildMetricCard('Recall', '96.1%'),
+        _buildMetricCard(context, 'Overall Accuracy', '95.2%'),
+        _buildMetricCard(context, 'Precision', '94.8%'),
+        _buildMetricCard(context, 'Recall', '96.1%'),
       ],
     );
   }
 
-  Widget _buildMetricCard(String title, String value) {
+  Widget _buildMetricCard(BuildContext context, String title, String value) {
     return Expanded(
       child: Card(
         elevation: 2,
-        shadowColor: Colors.grey.withOpacity(0.1),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shadowColor: colorWithOpacity(Colors.grey, 0.1),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(Responsive.scale(context, 12))),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 8.0),
+          padding: EdgeInsets.symmetric(
+              vertical: Responsive.scale(context, 20.0),
+              horizontal: Responsive.scale(context, 8.0)),
           child: Column(
             children: [
-              Text(title, style: GoogleFonts.manrope(color: Colors.grey[600]), textAlign: TextAlign.center),
-              const SizedBox(height: 8),
-              Text(value, style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 22), textAlign: TextAlign.center),
+              Text(title,
+                  style: GoogleFonts.manrope(color: Colors.grey[600]),
+                  textAlign: TextAlign.center),
+              SizedBox(height: Responsive.scale(context, 8)),
+              Text(value,
+                  style: GoogleFonts.manrope(
+                      fontWeight: FontWeight.bold,
+                      fontSize: Responsive.fontSize(context, 22)),
+                  textAlign: TextAlign.center),
             ],
           ),
         ),
@@ -100,28 +124,40 @@ class ModelPerformanceScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoCard({required String title, required String subtitle, required Widget child}) {
+  Widget _buildInfoCard(BuildContext context,
+      {required String title,
+      required String subtitle,
+      required Widget child}) {
     return Card(
       elevation: 2,
       shadowColor: Colors.grey.withOpacity(0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Responsive.scale(context, 16))),
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: EdgeInsets.all(Responsive.scale(context, 20.0)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Text(title, style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(width: 8),
-                const Icon(Icons.info_outline, color: Colors.grey, size: 16),
+                Text(title,
+                    style: GoogleFonts.manrope(
+                        fontWeight: FontWeight.bold,
+                        fontSize: Responsive.fontSize(context, 16))),
+                SizedBox(width: Responsive.scale(context, 8)),
+                Icon(Icons.info_outline,
+                    color: Colors.grey, size: Responsive.scale(context, 16)),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(subtitle, style: GoogleFonts.manrope(color: Colors.grey[600])),
-            const SizedBox(height: 16),
+            SizedBox(height: Responsive.scale(context, 4)),
+            Text(subtitle,
+                style: GoogleFonts.manrope(
+                    color: Colors.grey[600],
+                    fontSize: Responsive.fontSize(context, 14))),
+            SizedBox(height: Responsive.scale(context, 16)),
             ClipRRect(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius:
+                  BorderRadius.circular(Responsive.scale(context, 12)),
               child: child, // The placeholder image
             ),
           ],

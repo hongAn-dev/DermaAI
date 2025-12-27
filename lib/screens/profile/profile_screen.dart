@@ -1,8 +1,9 @@
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:myapp/utils/color_utils.dart';
+import 'package:myapp/utils/responsive.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -14,16 +15,40 @@ class ProfileScreen extends StatelessWidget {
     // A map to associate routes with their titles and icons
     final settingsItems = {
       'ACCOUNT': [
-        {'icon': Icons.person_outline, 'title': 'Personal Information', 'route': '/profile/personal_information'},
-        {'icon': Icons.subscriptions_outlined, 'title': 'Subscription Management', 'route': '/profile/subscription'},
+        {
+          'icon': Icons.person_outline,
+          'title': 'Personal Information',
+          'route': '/profile/personal_information'
+        },
+        {
+          'icon': Icons.subscriptions_outlined,
+          'title': 'Subscription Management',
+          'route': '/profile/subscription'
+        },
       ],
       'PREFERENCES': [
-        {'icon': Icons.palette_outlined, 'title': 'Appearance', 'route': '/profile/appearance'},
+        {
+          'icon': Icons.palette_outlined,
+          'title': 'Appearance',
+          'route': '/profile/appearance'
+        },
       ],
       'SECURITY & PRIVACY': [
-        {'icon': Icons.lock_outline, 'title': 'Change Password', 'route': '/profile/change_password'},
-        {'icon': Icons.shield_outlined, 'title': 'Privacy Policy', 'route': '/profile/privacy_policy'},
-        {'icon': Icons.article_outlined, 'title': 'Terms of Service', 'route': '/profile/terms_of_service'},
+        {
+          'icon': Icons.lock_outline,
+          'title': 'Change Password',
+          'route': '/profile/change_password'
+        },
+        {
+          'icon': Icons.shield_outlined,
+          'title': 'Privacy Policy',
+          'route': '/profile/privacy_policy'
+        },
+        {
+          'icon': Icons.article_outlined,
+          'title': 'Terms of Service',
+          'route': '/profile/terms_of_service'
+        },
       ],
     };
 
@@ -41,7 +66,7 @@ class ProfileScreen extends StatelessWidget {
           style: GoogleFonts.manrope(
             color: Colors.black,
             fontWeight: FontWeight.bold,
-            fontSize: 24,
+            fontSize: Responsive.fontSize(context, 24),
           ),
         ),
         centerTitle: true, // Center the title
@@ -50,31 +75,33 @@ class ProfileScreen extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
+            padding: EdgeInsets.all(Responsive.scale(context, 16.0)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildProfileHeader(user, context),
-                const SizedBox(height: 24),
+                SizedBox(height: Responsive.scale(context, 24)),
                 ...settingsItems.entries.map((entry) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildSectionTitle(entry.key),
+                      _buildSectionTitle(context, entry.key),
                       _buildSettingsCard(
+                        context,
                         entry.value.map((item) {
                           return _buildSettingsItem(
+                            context,
                             item['icon'] as IconData,
                             item['title'] as String,
                             () => context.go(item['route'] as String),
                           );
                         }).toList(),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: Responsive.scale(context, 24)),
                     ],
                   );
                 }),
-                const SizedBox(height: 8),
+                SizedBox(height: Responsive.scale(context, 8)),
                 _buildLogoutButton(context),
               ],
             ),
@@ -86,13 +113,13 @@ class ProfileScreen extends StatelessWidget {
 
   Widget _buildProfileHeader(User? user, BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(Responsive.scale(context, 16.0)),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.0),
+        borderRadius: BorderRadius.circular(Responsive.scale(context, 12.0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: colorWithOpacity(Colors.grey, 0.1),
             spreadRadius: 1,
             blurRadius: 5,
           ),
@@ -100,11 +127,11 @@ class ProfileScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const CircleAvatar(
-            radius: 30,
+          CircleAvatar(
+            radius: Responsive.avatarRadius(context, base: 30),
             backgroundImage: AssetImage('assets/images/default_avatar.png'),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: Responsive.scale(context, 16)),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -112,15 +139,15 @@ class ProfileScreen extends StatelessWidget {
                 user?.displayName ?? 'Eleanor Vance',
                 style: GoogleFonts.manrope(
                   fontWeight: FontWeight.bold,
-                  fontSize: 18,
+                  fontSize: Responsive.fontSize(context, 18),
                 ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: Responsive.scale(context, 4)),
               Text(
                 user?.email ?? 'eleanor.vance@example.com',
                 style: GoogleFonts.manrope(
                   color: Colors.grey[600],
-                  fontSize: 14,
+                  fontSize: Responsive.fontSize(context, 14),
                 ),
               ),
             ],
@@ -128,8 +155,10 @@ class ProfileScreen extends StatelessWidget {
           const Spacer(),
           CircleAvatar(
             backgroundColor: const Color(0xFF18A0FB),
+            radius: Responsive.avatarRadius(context, base: 20),
             child: IconButton(
-              icon: const Icon(Icons.edit, color: Colors.white, size: 16),
+              icon: Icon(Icons.edit,
+                  color: Colors.white, size: Responsive.scale(context, 16)),
               onPressed: () => context.go('/profile/personal_information'),
             ),
           ),
@@ -138,25 +167,27 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(BuildContext context, String title) {
     return Padding(
-      padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
+      padding: EdgeInsets.only(
+          left: Responsive.scale(context, 8.0),
+          bottom: Responsive.scale(context, 8.0)),
       child: Text(
         title,
         style: GoogleFonts.manrope(
           color: Colors.grey[600],
           fontWeight: FontWeight.bold,
-          fontSize: 12,
+          fontSize: Responsive.fontSize(context, 12),
         ),
       ),
     );
   }
 
-  Widget _buildSettingsCard(List<Widget> children) {
+  Widget _buildSettingsCard(BuildContext context, List<Widget> children) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.0),
+        borderRadius: BorderRadius.circular(Responsive.scale(context, 12.0)),
       ),
       child: Column(
         children: children,
@@ -164,14 +195,18 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSettingsItem(IconData icon, String title, VoidCallback onTap) {
+  Widget _buildSettingsItem(
+      BuildContext context, IconData icon, String title, VoidCallback onTap) {
     return ListTile(
       leading: Icon(icon, color: const Color(0xFF18A0FB)),
       title: Text(
         title,
-        style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w500),
+        style: GoogleFonts.manrope(
+            fontSize: Responsive.fontSize(context, 16),
+            fontWeight: FontWeight.w500),
       ),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+      trailing: Icon(Icons.arrow_forward_ios,
+          size: Responsive.scale(context, 16), color: Colors.grey),
       onTap: onTap,
     );
   }
@@ -181,14 +216,14 @@ class ProfileScreen extends StatelessWidget {
       child: TextButton(
         onPressed: () async {
           await FirebaseAuth.instance.signOut();
-           if (!context.mounted) return;
+          if (!context.mounted) return;
           context.go('/login');
         },
         child: Text(
           'Log Out',
           style: GoogleFonts.manrope(
             color: Colors.red,
-            fontSize: 16,
+            fontSize: Responsive.fontSize(context, 16),
             fontWeight: FontWeight.bold,
           ),
         ),

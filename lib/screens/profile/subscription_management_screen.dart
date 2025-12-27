@@ -1,6 +1,6 @@
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:myapp/utils/color_utils.dart';
 
 class SubscriptionManagementScreen extends StatelessWidget {
   const SubscriptionManagementScreen({super.key});
@@ -16,7 +16,8 @@ class SubscriptionManagementScreen extends StatelessWidget {
         ),
         title: Text(
           'Subscription Management',
-          style: GoogleFonts.manrope(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 18),
+          style: GoogleFonts.manrope(
+              fontWeight: FontWeight.bold, color: Colors.black, fontSize: 18),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -31,7 +32,8 @@ class SubscriptionManagementScreen extends StatelessWidget {
             const SizedBox(height: 32),
             _buildSectionTitle('Your Plan Benefits'),
             _buildBenefitItem(Icons.all_inclusive, 'Unlimited AI Scans'),
-            _buildBenefitItem(Icons.health_and_safety_outlined, 'Monthly Expert Consultation'),
+            _buildBenefitItem(Icons.health_and_safety_outlined,
+                'Monthly Expert Consultation'),
             _buildBenefitItem(Icons.history_toggle_off, 'Scan History Storage'),
             _buildBenefitItem(Icons.support_agent, 'Priority Support'),
             const SizedBox(height: 32),
@@ -41,15 +43,34 @@ class SubscriptionManagementScreen extends StatelessWidget {
                 backgroundColor: const Color(0xFF18A0FB),
                 foregroundColor: Colors.white,
                 minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                textStyle: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                textStyle: GoogleFonts.manrope(
+                    fontWeight: FontWeight.bold, fontSize: 16),
               ),
               child: const Text('Upgrade Plan'),
             ),
             const SizedBox(height: 24),
-            Center(child: TextButton(onPressed: () {}, child: Text('Manage Payment Methods', style: GoogleFonts.manrope(color: Colors.grey[700], fontWeight: FontWeight.w500)))),
-            Center(child: TextButton(onPressed: () {}, child: Text('Transaction History', style: GoogleFonts.manrope(color: Colors.grey[700], fontWeight: FontWeight.w500)))),
-            Center(child: TextButton(onPressed: () {}, child: Text('Cancel Subscription', style: GoogleFonts.manrope(color: Colors.red, fontWeight: FontWeight.w500)))),
+            Center(
+                child: TextButton(
+                    onPressed: () {},
+                    child: Text('Manage Payment Methods',
+                        style: GoogleFonts.manrope(
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w500)))),
+            Center(
+                child: TextButton(
+                    onPressed: () {},
+                    child: Text('Transaction History',
+                        style: GoogleFonts.manrope(
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w500)))),
+            Center(
+                child: TextButton(
+                    onPressed: () {},
+                    child: Text('Cancel Subscription',
+                        style: GoogleFonts.manrope(
+                            color: Colors.red, fontWeight: FontWeight.w500)))),
           ],
         ),
       ),
@@ -59,7 +80,7 @@ class SubscriptionManagementScreen extends StatelessWidget {
   Widget _buildCurrentPlanCard() {
     return Card(
       elevation: 1,
-      shadowColor: Colors.grey.withOpacity(0.1),
+      shadowColor: colorWithOpacity(Colors.grey, 0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -69,9 +90,12 @@ class SubscriptionManagementScreen extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Premium Plan', style: GoogleFonts.manrope(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text('Premium Plan',
+                    style: GoogleFonts.manrope(
+                        fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text('Renews on Dec 25, 2024', style: GoogleFonts.manrope(color: Colors.grey[600])),
+                Text('Renews on Dec 25, 2024',
+                    style: GoogleFonts.manrope(color: Colors.grey[600])),
               ],
             ),
             Container(
@@ -80,7 +104,10 @@ class SubscriptionManagementScreen extends StatelessWidget {
                 color: Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text('Active', style: GoogleFonts.manrope(color: Colors.blue.shade800, fontWeight: FontWeight.bold)),
+              child: Text('Active',
+                  style: GoogleFonts.manrope(
+                      color: Colors.blue.shade800,
+                      fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -110,11 +137,13 @@ class SubscriptionManagementScreen extends StatelessWidget {
       color: Colors.white,
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFF18A0FB).withOpacity(0.1),
+          backgroundColor: colorWithOpacity(const Color(0xFF18A0FB), 0.1),
           foregroundColor: const Color(0xFF18A0FB),
           child: Icon(icon, size: 20),
         ),
-        title: Text(text, style: GoogleFonts.manrope(fontWeight: FontWeight.w600, fontSize: 16)),
+        title: Text(text,
+            style:
+                GoogleFonts.manrope(fontWeight: FontWeight.w600, fontSize: 16)),
       ),
     );
   }

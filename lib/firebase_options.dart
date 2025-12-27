@@ -23,10 +23,7 @@ class DefaultFirebaseOptions {
           'you can reconfigure this by running the FlutterFire CLI again.',
         );
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -46,7 +43,7 @@ class DefaultFirebaseOptions {
     projectId: 'realtimefrb-27357',
     authDomain: 'realtimefrb-27357.firebaseapp.com',
     databaseURL: 'https://realtimefrb-27357-default-rtdb.asia-southeast1.firebasedatabase.app',
-    storageBucket: 'realtimefrb-27357.appspot.com', // CORRECTED VALUE
+    storageBucket: 'realtimefrb-27357.firebasestorage.app',
     measurementId: 'G-YQ88NJE2WF',
   );
 
@@ -56,6 +53,18 @@ class DefaultFirebaseOptions {
     messagingSenderId: '71384070933',
     projectId: 'realtimefrb-27357',
     databaseURL: 'https://realtimefrb-27357-default-rtdb.asia-southeast1.firebasedatabase.app',
-    storageBucket: 'realtimefrb-27357.appspot.com', // CORRECTED VALUE
+    storageBucket: 'realtimefrb-27357.firebasestorage.app',
   );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyDalQQKQlRuLKQ8vyC6JbYFL3Rl5B1kWsI',
+    appId: '1:71384070933:web:5b4304520d44a4a42d071c',
+    messagingSenderId: '71384070933',
+    projectId: 'realtimefrb-27357',
+    authDomain: 'realtimefrb-27357.firebaseapp.com',
+    databaseURL: 'https://realtimefrb-27357-default-rtdb.asia-southeast1.firebasedatabase.app',
+    storageBucket: 'realtimefrb-27357.firebasestorage.app',
+    measurementId: 'G-5MWS5W85FH',
+  );
+
 }

@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:myapp/utils/responsive.dart';
+import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:myapp/utils/color_utils.dart';
 import 'package:myapp/screens/responsive_scaffold.dart';
+import 'chat_screen.dart';
 
 // --- Data Model ---
 class Doctor {
   final String name;
   final String specialization;
+  final String uid;
   final double rating;
   final int reviewCount;
   final String nextAvailable;
   final String imagePath;
 
   Doctor({
+    required this.uid,
     required this.name,
     required this.specialization,
     required this.rating,
@@ -24,26 +31,6 @@ class Doctor {
 // --- Main Screen Widget ---
 class ConsultScreen extends StatelessWidget {
   const ConsultScreen({super.key});
-
-  // --- Mock Data ---
-  static final List<Doctor> doctors = [
-    Doctor(
-      name: 'Dr. Evelyn Reed, MD',
-      specialization: 'Board-Certified Dermatologist',
-      rating: 4.9,
-      reviewCount: 124,
-      nextAvailable: 'Today, 4:30 PM',
-      imagePath: 'assets/images/doctor1.png', // Placeholder
-    ),
-    Doctor(
-      name: 'Dr. Marcus Chen, FAAD',
-      specialization: 'Pediatric & Cosmetic Dermatology',
-      rating: 4.8,
-      reviewCount: 98,
-      nextAvailable: 'Tomorrow, 9:00 AM',
-      imagePath: 'assets/images/doctor2.png', // Placeholder
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -62,61 +49,120 @@ class ConsultPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              context.go('/home');
+            }
+          },
+        ),
         title: Text(
-          'Consult an Expert',
+          'Tư vấn từ xa',
           style: GoogleFonts.manrope(
-              fontWeight: FontWeight.bold, color: Colors.black, fontSize: 20),
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+              fontSize: Responsive.fontSize(context, 20)),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          IconButton(icon: const Icon(Icons.notifications_none_outlined, color: Colors.black), onPressed: () {}),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Get a professional opinion on your AI analysis. Connect with a board-certified dermatologist.',
-              style: GoogleFonts.manrope(fontSize: 14, color: Colors.grey[600]),
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Bác sĩ được đề xuất',
+                    style: GoogleFonts.manrope(
+                        fontWeight: FontWeight.bold,
+                        fontSize: Responsive.fontSize(context, 20))),
+                TextButton(
+                    onPressed: () {},
+                    child: Text('Xem tất cả',
+                        style: GoogleFonts.manrope(
+                            color: const Color(0xFF18A0FB)))),
+              ],
             ),
-            const SizedBox(height: 24),
-            _buildQuickActions(),
-            const SizedBox(height: 24),
-            _buildSearchBar(),
-            const SizedBox(height: 16),
-            _buildFilterChips(),
-            const SizedBox(height: 24),
-            ...ConsultScreen.doctors.map((doctor) => _buildDoctorCard(doctor)),
+            SizedBox(height: Responsive.scale(context, 12)),
+            // List
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .where('role', isEqualTo: 'doctor')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                      child: Text('Lỗi tải bác sĩ: ${snapshot.error}'));
+                }
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final docs = snapshot.data!.docs;
+                // debug log
+                // ignore: avoid_print
+                print('ConsultScreen: found ${docs.length} doctor docs');
+                if (docs.isEmpty) {
+                  return Center(
+                      child: Text('Không có bác sĩ nào trong cơ sở dữ liệu'));
+                }
+                return Column(
+                  children: docs.map((doc) {
+                    final data = doc.data() as Map<String, dynamic>? ?? {};
+                    final doctor = Doctor(
+                      uid: doc.id,
+                      name: (data['displayName'] as String?) ?? 'Unknown',
+                      specialization:
+                          (data['specialization'] as String?) ?? 'Dermatology',
+                      rating: (data['rating'] as num?)?.toDouble() ?? 4.8,
+                      reviewCount: (data['reviewCount'] as int?) ?? 0,
+                      nextAvailable: (data['nextAvailable'] as String?) ?? '',
+                      imagePath: (data['photoUrl'] as String?) ??
+                          'assets/images/doctor1.png',
+                    );
+                    return _buildDoctorCard(context, doctor);
+                  }).toList(),
+                );
+              },
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        _buildActionChip(Icons.video_camera_front_outlined, 'Video Call'),
-        _buildActionChip(Icons.calendar_today_outlined, 'Schedule'),
-        _buildActionChip(Icons.message_outlined, 'Message'),
+        _buildActionChip(
+            context, Icons.video_camera_front_outlined, 'Gọi video'),
+        _buildActionChip(context, Icons.calendar_today_outlined, 'Lịch hẹn'),
+        _buildActionChip(context, Icons.message_outlined, 'Tin nhắn'),
       ],
     );
   }
 
-  Widget _buildActionChip(IconData icon, String label) {
+  Widget _buildActionChip(BuildContext context, IconData icon, String label) {
     return Column(
       children: [
         CircleAvatar(
-          radius: 30,
+          radius: Responsive.avatarRadius(context, base: 30),
           backgroundColor: Colors.blue.shade50,
-          child: Icon(icon, color: Colors.blue.shade800, size: 28),
+          child: Icon(icon,
+              color: Colors.blue.shade800, size: Responsive.scale(context, 28)),
         ),
-        const SizedBox(height: 8),
-        Text(label, style: GoogleFonts.manrope(fontWeight: FontWeight.w600)),
+        SizedBox(height: Responsive.scale(context, 8)),
+        Text(label,
+            style: GoogleFonts.manrope(
+                fontWeight: FontWeight.w600,
+                fontSize: Responsive.fontSize(context, 12))),
       ],
     );
   }
@@ -124,7 +170,7 @@ class ConsultPage extends StatelessWidget {
   Widget _buildSearchBar() {
     return TextField(
       decoration: InputDecoration(
-        hintText: 'Search by name, specialty...',
+        hintText: 'Tìm theo tên, chuyên khoa...',
         prefixIcon: const Icon(Icons.search, color: Colors.grey),
         filled: true,
         fillColor: Colors.white,
@@ -136,10 +182,10 @@ class ConsultPage extends StatelessWidget {
     );
   }
 
-  Widget _buildFilterChips() {
-    final filters = ['Available Now', 'Top Rated', 'Pediatric', 'More'];
+  Widget _buildFilterChips(BuildContext context) {
+    final filters = ['Có sẵn', 'Được đánh giá cao', 'Nhi khoa', 'Thêm'];
     return SizedBox(
-      height: 40,
+      height: Responsive.scale(context, 40),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: filters.length,
@@ -148,99 +194,117 @@ class ConsultPage extends StatelessWidget {
           bool isSelected = index == 0;
           return Chip(
             label: Text(filters[index]),
-            backgroundColor: isSelected ? const Color(0xFF18A0FB) : Colors.white,
-            labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black),
-            side: isSelected ? BorderSide.none : BorderSide(color: Colors.grey[300]!),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            backgroundColor:
+                isSelected ? const Color(0xFF18A0FB) : Colors.white,
+            labelStyle:
+                TextStyle(color: isSelected ? Colors.white : Colors.black),
+            side: isSelected
+                ? BorderSide.none
+                : BorderSide(color: Colors.grey[300]!),
+            shape: RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(Responsive.scale(context, 20))),
           );
         },
       ),
     );
   }
 
-   Widget _buildDoctorCard(Doctor doctor) {
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      shadowColor: Colors.grey.withOpacity(0.1),
+  Widget _buildDoctorCard(BuildContext context, Doctor doctor) {
+    return Container(
+      margin: EdgeInsets.only(bottom: Responsive.scale(context, 16)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(Responsive.scale(context, 16)),
+        boxShadow: [
+          BoxShadow(
+              color: colorWithOpacity(Colors.grey, 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 6))
+        ],
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
+        padding: EdgeInsets.symmetric(
+            horizontal: Responsive.scale(context, 14),
+            vertical: Responsive.scale(context, 12)),
+        child: Row(
           children: [
-            Row(
+            Stack(
+              clipBehavior: Clip.none,
               children: [
                 CircleAvatar(
-                  radius: 32,
+                  radius: Responsive.avatarRadius(context, base: 36),
                   backgroundColor: Colors.grey[200],
-                  // TODO: Add doctor images to assets
-                  // backgroundImage: AssetImage(doctor.imagePath),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(doctor.name, style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16)),
-                      const SizedBox(height: 4),
-                      Text(doctor.specialization, style: GoogleFonts.manrope(color: Colors.grey[600])),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 16),
-                          const SizedBox(width: 4),
-                          Text('${doctor.rating} (${doctor.reviewCount} reviews)', style: GoogleFonts.manrope()),
-                        ],
-                      ),
-                    ],
+                Positioned(
+                  right: -4,
+                  bottom: -4,
+                  child: Container(
+                    width: Responsive.scale(context, 14),
+                    height: Responsive.scale(context, 14),
+                    decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color: Colors.white,
+                            width: Responsive.scale(context, 2))),
                   ),
-                ),
+                )
               ],
             ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            SizedBox(width: Responsive.scale(context, 16)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Next available', style: GoogleFonts.manrope()),
-                  Text(doctor.nextAvailable, style: GoogleFonts.manrope(fontWeight: FontWeight.bold, color: Colors.blue.shade800)),
+                  Text(doctor.name,
+                      style: GoogleFonts.manrope(
+                          fontWeight: FontWeight.bold,
+                          fontSize: Responsive.fontSize(context, 18))),
+                  SizedBox(height: Responsive.scale(context, 6)),
+                  Text(doctor.specialization.toUpperCase(),
+                      style: GoogleFonts.manrope(
+                          color: const Color(0xFF18A0FB),
+                          fontSize: Responsive.fontSize(context, 12),
+                          letterSpacing: 0.6)),
+                  SizedBox(height: Responsive.scale(context, 8)),
+                  Row(
+                    children: [
+                      Icon(Icons.star,
+                          color: Colors.amber,
+                          size: Responsive.scale(context, 16)),
+                      SizedBox(width: Responsive.scale(context, 8)),
+                      Text('${doctor.rating}',
+                          style: GoogleFonts.manrope(
+                              fontWeight: FontWeight.w600,
+                              fontSize: Responsive.fontSize(context, 14))),
+                    ],
+                  )
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
+            SizedBox(width: Responsive.scale(context, 12)),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.calendar_today_outlined),
-                    label: const Text('Schedule'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF18A0FB),
-                      side: const BorderSide(color: Color(0xFF18A0FB)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => ChatScreen(doctor: doctor)));
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF18A0FB),
+                    shape: const StadiumBorder(),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: Responsive.scale(context, 20),
+                        vertical: Responsive.scale(context, 10)),
+                    elevation: 0,
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.video_camera_front),
-                    label: const Text('Book Now'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF18A0FB),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
+                  child: Text('Trò chuyện',
+                      style: GoogleFonts.manrope(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: Responsive.fontSize(context, 14))),
                 ),
               ],
             )

@@ -1,4 +1,3 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -14,7 +13,8 @@ class FirestoreService {
   User? get currentUser => _auth.currentUser;
 
   /// Saves raw analysis data (as a Map) to the 'scan_history' collection.
-  Future<void> saveRawAnalysisResult(String docId, Map<String, dynamic> data) async {
+  Future<void> saveRawAnalysisResult(
+      String docId, Map<String, dynamic> data) async {
     if (currentUser == null) throw Exception("User not logged in");
     try {
       await _db.collection(_collectionName).doc(docId).set(data);
@@ -37,8 +37,9 @@ class FirestoreService {
       return snapshot.docs.map((doc) {
         final data = doc.data();
         final scanResult = data['scanResult'] as Map<String, dynamic>? ?? {};
-        final prediction = scanResult['prediction'] as Map<String, dynamic>? ?? {};
-        
+        final prediction =
+            scanResult['prediction'] as Map<String, dynamic>? ?? {};
+
         final detailsList = (scanResult['details'] as List<dynamic>?)
                 ?.map((d) => d as Map<String, dynamic>)
                 .toList() ??
@@ -48,10 +49,12 @@ class FirestoreService {
           id: doc.id,
           userId: scanResult['userId'] as String? ?? '',
           disease: prediction['className'] as String? ?? 'N/A',
-          probability: (prediction['confidenceScore'] as num?)?.toDouble() ?? 0.0,
+          probability:
+              (prediction['confidenceScore'] as num?)?.toDouble() ?? 0.0,
           recommendation: "Consult a dermatologist for a professional opinion.",
           imageUrl: data['imagePath'] as String? ?? '', // Will be empty
-          timestamp: (scanResult['timestamp'] as Timestamp? ?? Timestamp.now()).toDate(),
+          timestamp: (scanResult['timestamp'] as Timestamp? ?? Timestamp.now())
+              .toDate(),
           details: detailsList.map((d) => DiseaseDetail.fromJson(d)).toList(),
         );
       }).toList();
@@ -66,6 +69,16 @@ class FirestoreService {
       await _db.collection(_collectionName).doc(analysisId).delete();
     } catch (e) {
       print("Error deleting analysis: \$e");
+      rethrow;
+    }
+  }
+
+  /// Ensure a user document exists in Firestore under `users/{uid}`
+  Future<void> ensureUserDoc(String uid, Map<String, dynamic> data) async {
+    try {
+      await _db.collection('users').doc(uid).set(data, SetOptions(merge: true));
+    } catch (e) {
+      print('Error writing user doc: $e');
       rethrow;
     }
   }
