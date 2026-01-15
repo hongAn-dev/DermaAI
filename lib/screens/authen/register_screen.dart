@@ -1,12 +1,10 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:myapp/services/realtime_service.dart';
+import 'package:provider/provider.dart';
+import '../../view_models/auth_view_model.dart';
 import 'package:myapp/utils/color_utils.dart';
-import 'package:myapp/services/firestore_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -52,61 +50,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    try {
-      final credential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-              email: _emailController.text.trim(),
-              password: _passwordController.text);
+    final success = await context.read<AuthViewModel>().register(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          displayName: _displayNameController.text.trim(),
+          role: _role,
+        );
 
-      final user = credential.user ?? FirebaseAuth.instance.currentUser;
+    if (!mounted) return;
 
-      if (user != null) {
-        // Cập nhật display name cho chính user trong Auth (tuỳ chọn, nhưng nên làm)
-        await user.updateDisplayName(_displayNameController.text.trim());
-
-        // 2. Chuẩn bị dữ liệu user (Bao gồm password và display name từ controller)
-        final userData = {
-          'displayName':
-              _displayNameController.text.trim(), // Lấy từ controller
-          'email': user.email ?? _emailController.text,
-          'password': _passwordController.text, // Thêm password theo yêu cầu
-          'role': _role,
-        };
-
-        try {
-          // Ghi vào Realtime DB
-          await RealtimeService().ensureUser(user.uid, userData);
-        } catch (e) {
-          // ignore: avoid_print
-          print('Realtime DB write failed: $e');
-          setState(() {
-            _errorMessage = 'Không thể ghi dữ liệu Realtime DB: $e';
-          });
-        }
-
-        try {
-          // Ghi vào Firestore (Thêm createdAt)
-          await FirestoreService().ensureUserDoc(user.uid, {
-            ...userData,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-        } catch (e) {
-          // ignore: avoid_print
-          print('Firestore user doc write failed: $e');
-          setState(() {
-            _errorMessage = 'Không thể ghi dữ liệu Firestore: $e';
-          });
-        }
-      }
-
-      if (!mounted) return;
-
-      if (_errorMessage.isNotEmpty) return;
-
+    if (success) {
       context.go('/home');
-    } on FirebaseAuthException catch (e) {
+    } else {
+      // Error is set in ViewModel, but we need to show it or force rebuild
+      final error = context.read<AuthViewModel>().errorMessage;
       setState(() {
-        _errorMessage = e.message ?? 'Đã xảy ra lỗi không xác định.';
+        _errorMessage = error ?? 'Đăng ký thất bại';
       });
     }
   }
@@ -191,7 +150,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     DropdownButtonFormField<String>(
                       initialValue: _role,
                       items: const [
-                        DropdownMenuItem(value: 'user', child: Text('Người dùng')),
+                        DropdownMenuItem(
+                            value: 'user', child: Text('Người dùng')),
                         DropdownMenuItem(
                             value: 'doctor', child: Text('Bác sĩ')),
                       ],

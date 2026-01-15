@@ -2,6 +2,12 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/appearance_model.dart';
+import 'data/repositories/doctor_repository.dart';
+import 'data/repositories/chat_repository.dart';
+import 'data/repositories/auth_repository.dart'; // Import AuthRepository
+import 'view_models/consult_view_model.dart';
+import 'view_models/chat_view_model.dart';
+import 'view_models/auth_view_model.dart'; // Import AuthViewModel
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -60,14 +66,39 @@ void main() async {
     developer.log("❌ LỖI NGHIÊM TRỌNG KHI KẾT NỐI FIREBASE: $e");
   }
 
-  // 3. Chạy UI
+  // 3. Register Providers & Run App
   developer.log("📺 --- ĐANG MỞ GIAO DIỆN (RUN APP) ---");
 
-  // Khởi tạo AppearanceModel trước khi runApp để load cài đặt
+  // Keep AppearanceModel
   final appearanceModel = AppearanceModel();
   await appearanceModel.load();
 
-  runApp(ChangeNotifierProvider.value(value: appearanceModel, child: MyApp()));
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: appearanceModel),
+        Provider<AuthRepository>(create: (_) => AuthRepository()),
+        Provider<DoctorRepository>(create: (_) => DoctorRepository()),
+        Provider<ChatRepository>(create: (_) => ChatRepository()),
+        ChangeNotifierProvider(
+          create: (context) => AuthViewModel(
+            authRepository: context.read<AuthRepository>(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => ConsultViewModel(
+            doctorRepository: context.read<DoctorRepository>(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => ChatViewModel(
+            chatRepository: context.read<ChatRepository>(),
+          ),
+        ),
+      ],
+      child: MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

@@ -1,3 +1,4 @@
+import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart'; // Import for kIsWeb
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -11,13 +12,12 @@ import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
 // Import your utility files
 
 import 'package:flutter_linkify/flutter_linkify.dart'; // Import Linkify
-import 'package:file_picker/file_picker.dart'; // Import File Picker
 import 'package:url_launcher/url_launcher.dart'; // Import URL Launcher
-import 'package:image_picker/image_picker.dart'; // Import ImagePicker
 import 'package:myapp/utils/responsive.dart';
-import '../../services/realtime_service.dart';
-import '../../services/upload_service.dart'; // Import UploadService
-import '../../models/doctor.dart';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart'; // Import Emoji Picker
+import '../../services/realtime_service.dart'; // For chatId helper only
+import '../../data/models/doctor_model.dart';
+import '../../view_models/chat_view_model.dart';
 
 // --- ZEGOCLOUD CONFIGURATION ---
 const int yourAppID = 971082061; // <-- Replace with your real App ID
@@ -36,14 +36,17 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scroll = ScrollController();
-  bool _isUploading = false; // Add loading state
   bool _isEditMode = false; // Add edit mode state
 
   final List<_Message> _messages = [];
-  late final RealtimeService _realtime;
-  late final UploadService _uploadService; // custom upload service
-  final ImagePicker _picker = ImagePicker();
   Stream<DatabaseEvent>? _messagesStream;
+  bool _showEmoji = false;
+  final FocusNode _focusNode = FocusNode();
+
+  // Sidebar Search State
+  final TextEditingController _sidebarSearchController =
+      TextEditingController();
+  String _sidebarSearchQuery = '';
 
   final String currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
   String currentUserName = 'User';
@@ -51,35 +54,35 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _realtime = RealtimeService();
-    _uploadService = UploadService();
-
     final user = FirebaseAuth.instance.currentUser;
     if (user?.displayName != null && user!.displayName!.isNotEmpty) {
       currentUserName = user.displayName!;
     }
 
+    // Ensure user exists in RTDB (Migration/Safety check)
+    // We can move this to Repository/ViewModel later or keep it here as a side effect
+    // For now, let's keep it simple and maybe skip it or call a repo method if exposed.
+    // The ViewModel doesn't explicitly have ensureUser, but it's a one-time check.
+    // Let's rely on previous logic or just skip for now to focus on messaging.
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initChatListener();
     });
+
+    _focusNode.addListener(() {
+      if (_focusNode.hasFocus) {
+        setState(() {
+          _showEmoji = false;
+        });
+      }
+    });
   }
 
-  Future<void> _initChatListener() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  void _initChatListener() {
+    final viewModel = context.read<ChatViewModel>();
+    final chatId = viewModel.getChatId(currentUid, widget.doctor.uid);
 
-    try {
-      await _realtime.ensureUser(currentUid, {
-        'displayName': user.displayName ?? '',
-        'email': user.email ?? '',
-        'role': 'user'
-      });
-    } catch (e) {
-      debugPrint("Error ensuring user: $e");
-    }
-
-    final chatId = RealtimeService.chatId(currentUid, widget.doctor.uid);
-    _messagesStream = _realtime.messagesStream(chatId);
+    _messagesStream = viewModel.getMessagesStream(chatId);
     _messagesStream!.listen((event) {
       final snapshot = event.snapshot;
       final kids = snapshot.children;
@@ -103,8 +106,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
         final isMe = (senderId == currentUid);
         final type = val['type']?.toString() ?? 'text';
-        final imageUrl = val['url']?.toString();
-        final key = child.key ?? ''; // Get Firebase key
+        final imageUrl = val['url']?.toString() ??
+            val['imageUrl']?.toString() ??
+            val['fileUrl']?.toString(); // Handle different keys
+        final key = child.key ?? '';
 
         loaded.add(_Message(
             key: key,
@@ -187,6 +192,14 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
   // ----------------------------------------
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _sidebarSearchController.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -282,26 +295,37 @@ class _ChatScreenState extends State<ChatScreen> {
         elevation: 1,
         centerTitle: true,
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth > 800) {
-            // Desktop/Tablet View
-            return Row(
-              children: [
-                Container(
-                  width: 300, // Increased width as requested
-                  child: _buildSidebar(context),
-                ),
-                Expanded(
-                  child: _buildChatArea(context),
-                ),
-              ],
-            );
-          } else {
-            // Mobile View
-            return _buildChatArea(context);
+      body: WillPopScope(
+        onWillPop: () async {
+          if (_showEmoji) {
+            setState(() {
+              _showEmoji = false;
+            });
+            return false;
           }
+          return true;
         },
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 800) {
+              // Desktop/Tablet View
+              return Row(
+                children: [
+                  Container(
+                    width: 300, // Increased width as requested
+                    child: _buildSidebar(context),
+                  ),
+                  Expanded(
+                    child: _buildChatArea(context),
+                  ),
+                ],
+              );
+            } else {
+              // Mobile View
+              return _buildChatArea(context);
+            }
+          },
+        ),
       ),
     );
   }
@@ -317,9 +341,28 @@ class _ChatScreenState extends State<ChatScreen> {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
+              controller: _sidebarSearchController,
+              onChanged: (value) {
+                setState(() {
+                  _sidebarSearchQuery = value.toLowerCase();
+                });
+              },
               decoration: InputDecoration(
                 hintText: 'Tìm kiếm...',
                 prefixIcon: const Icon(Icons.search),
+                suffixIcon: _sidebarSearchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          setState(() {
+                            _sidebarSearchController.clear();
+                            _sidebarSearchQuery = '';
+                            _focusNode
+                                .requestFocus(); // Ensure focus returns to text field
+                          });
+                        },
+                      )
+                    : null,
                 filled: true,
                 fillColor: Colors.grey[100],
                 border: OutlineInputBorder(
@@ -352,16 +395,35 @@ class _ChatScreenState extends State<ChatScreen> {
                   final v = value as Map<Object?, Object?>;
                   chats.add(v.cast<String, dynamic>());
                 });
-                chats.sort((a, b) => (b['timestamp'] as int? ?? 0)
+
+                // Filter Logic
+                final filteredChats = chats.where((chat) {
+                  final otherName =
+                      (chat['otherName'] as String?)?.toLowerCase() ?? '';
+                  final lastMsg =
+                      (chat['lastMessage'] as String?)?.toLowerCase() ?? '';
+                  return otherName.contains(_sidebarSearchQuery) ||
+                      lastMsg.contains(_sidebarSearchQuery);
+                }).toList();
+
+                filteredChats.sort((a, b) => (b['timestamp'] as int? ?? 0)
                     .compareTo(a['timestamp'] as int? ?? 0));
 
+                if (filteredChats.isEmpty) {
+                  return Center(
+                      child: Text('Không tìm thấy kết quả',
+                          style: GoogleFonts.manrope(color: Colors.grey)));
+                }
+
                 return ListView.builder(
-                  itemCount: chats.length,
+                  itemCount: filteredChats.length,
                   itemBuilder: (context, index) {
-                    final chat = chats[index];
+                    final chat = filteredChats[index];
                     final otherName = chat['otherName'] ?? 'Unknown';
                     final lastMsg = chat['lastMessage'] ?? '';
-                    // simplistic time display
+                    final otherImage =
+                        chat['otherImage'] as String?; // Get image
+
                     final ts = chat['timestamp'] as int? ?? 0;
                     final dt = DateTime.fromMillisecondsSinceEpoch(ts);
                     final timeStr =
@@ -369,8 +431,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
                     return ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: Colors.blue[100],
-                        child: Text(otherName.isNotEmpty ? otherName[0] : '?'),
+                        backgroundColor: Colors.transparent,
+                        backgroundImage: (otherImage != null &&
+                                otherImage.isNotEmpty &&
+                                otherImage.startsWith('http'))
+                            ? NetworkImage(otherImage)
+                            : null,
+                        child: (otherImage == null ||
+                                otherImage.isEmpty ||
+                                !otherImage.startsWith('http'))
+                            ? Image.asset('assets/images/doctor_avatar.png',
+                                fit: BoxFit.cover)
+                            : null,
                       ),
                       title: Text(otherName,
                           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -445,26 +517,45 @@ class _ChatScreenState extends State<ChatScreen> {
                   },
                 ),
         ),
-        if (_isUploading) // Show loading indicator
-          Container(
-            padding: const EdgeInsets.all(8),
-            color: Colors.white,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2)),
-                SizedBox(width: 8),
-                Text("Đang gửi ảnh...",
-                    style:
-                        GoogleFonts.manrope(fontSize: 12, color: Colors.grey)),
-              ],
-            ),
-          ),
+        Consumer<ChatViewModel>(
+          builder: (context, viewModel, child) {
+            if (viewModel.isUploading) {
+              return Container(
+                padding: const EdgeInsets.all(8),
+                color: Colors.white,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2)),
+                    SizedBox(width: 8),
+                    Text("Đang gửi...",
+                        style: GoogleFonts.manrope(
+                            fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
         _buildInputArea(context),
+        if (_showEmoji) _buildEmojiPicker(),
       ],
+    );
+  }
+
+  Widget _buildEmojiPicker() {
+    return SizedBox(
+      height: 250,
+      child: EmojiPicker(
+        onEmojiSelected: (category, emoji) {
+          _controller.text = _controller.text + emoji.emoji;
+        },
+        // config: Config(...), // Removing Config to avoid undefined name error
+      ),
     );
   }
 
@@ -480,10 +571,22 @@ class _ChatScreenState extends State<ChatScreen> {
           if (!isMe)
             Padding(
               padding: const EdgeInsets.only(right: 8.0, bottom: 4),
-              child: Text(
-                'U', // Placeholder for avatar text or image
-                style: TextStyle(
-                    color: Colors.blue[300], fontWeight: FontWeight.bold),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.transparent,
+                backgroundImage: (widget.doctor.imagePath.startsWith('http') ||
+                        widget.doctor.imagePath.startsWith('assets'))
+                    ? (widget.doctor.imagePath.startsWith('http')
+                        ? NetworkImage(widget.doctor.imagePath)
+                        : AssetImage(widget.doctor.imagePath) as ImageProvider)
+                    : null,
+                child: (widget.doctor.imagePath.trim().isEmpty ||
+                        (widget.doctor.imagePath.startsWith('http') == false &&
+                            widget.doctor.imagePath.startsWith('assets') ==
+                                false))
+                    ? Image.asset('assets/images/doctor_avatar.png',
+                        fit: BoxFit.cover)
+                    : null,
               ),
             ),
           Column(
@@ -680,9 +783,28 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  suffixIcon: Icon(Icons.sentiment_satisfied_alt,
-                      color: Colors.grey[500]),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                        _showEmoji
+                            ? Icons.keyboard
+                            : Icons.sentiment_satisfied_alt,
+                        color: Colors.grey[500]),
+                    onPressed: () {
+                      setState(() {
+                        _showEmoji = !_showEmoji;
+                        if (_showEmoji) {
+                          _focusNode.unfocus();
+                        } else {
+                          // Slight delay to ensure UI rebuilds before requesting focus
+                          Future.delayed(const Duration(milliseconds: 100), () {
+                            if (mounted) _focusNode.requestFocus();
+                          });
+                        }
+                      });
+                    },
+                  ),
                 ),
+                focusNode: _focusNode,
               ),
             ),
             const SizedBox(width: 12),
@@ -707,127 +829,52 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    final chatId = RealtimeService.chatId(user.uid, widget.doctor.uid);
-    final message = {
-      'text': text,
-      'senderId': user.uid,
-      'senderName': user.displayName ?? '',
-      'otherId': widget.doctor.uid,
-      'timestamp': ServerValue.timestamp,
-      'type': 'text',
-    };
 
-    // Pass Doctor name as 'otherName' for MY list
-    // Pass MY name as 'myName' for HER list
-    await _realtime.sendMessage(
-      chatId,
-      message,
+    _controller.clear();
+    setState(() {
+      _showEmoji = false;
+    });
+
+    final viewModel = context.read<ChatViewModel>();
+    final chatId = viewModel.getChatId(currentUid, widget.doctor.uid);
+
+    await viewModel.sendMessage(
+      chatId: chatId,
+      text: text,
+      senderId: currentUid,
+      otherId: widget.doctor.uid,
+      myName: currentUserName,
       otherName: widget.doctor.name,
       otherImage: widget.doctor.imagePath,
-      myName: user.displayName ?? 'User',
     );
-    _controller.clear();
   }
 
   Future<void> _pickImage() async {
-    try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-      if (image == null) return;
+    final viewModel = context.read<ChatViewModel>();
+    final chatId = viewModel.getChatId(currentUid, widget.doctor.uid);
 
-      setState(() {
-        _isUploading = true;
-      });
-
-      // Upload via UploadService
-      final url = await _uploadService.uploadImage(image);
-
-      if (url != null && !url.contains('SIZE_LIMIT_EXCEEDED')) {
-        // Send message with type=image
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          final chatId = RealtimeService.chatId(user.uid, widget.doctor.uid);
-          final message = {
-            'text': '[Hình ảnh]',
-            'url': url,
-            'senderId': user.uid,
-            'senderName': user.displayName ?? '',
-            'otherId': widget.doctor.uid,
-            'timestamp': ServerValue.timestamp,
-            'type': 'image',
-          };
-          await _realtime.sendMessage(
-            chatId,
-            message,
-            otherName: widget.doctor.name,
-            otherImage: widget.doctor.imagePath,
-            myName: user.displayName ?? 'User',
-          );
-        }
-      } else if (url == 'SIZE_LIMIT_EXCEEDED') {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Ảnh quá lớn! Vui lòng chọn ảnh < 10MB")));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Gửi ảnh thất bại. Vui lòng thử lại sau.")));
-      }
-    } catch (e) {
-      debugPrint("Pick image error: $e");
-    } finally {
-      if (mounted) setState(() => _isUploading = false);
-    }
+    await viewModel.sendImage(
+      chatId: chatId,
+      senderId: currentUid,
+      otherId: widget.doctor.uid,
+      myName: currentUserName,
+      otherName: widget.doctor.name,
+      otherImage: widget.doctor.imagePath,
+    );
   }
 
   Future<void> _pickAnyFile() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(withData: true);
-      if (result == null || result.files.isEmpty) return;
+    final viewModel = context.read<ChatViewModel>();
+    final chatId = viewModel.getChatId(currentUid, widget.doctor.uid);
 
-      final file = result.files.first;
-      if (file.bytes == null) return;
-
-      setState(() {
-        _isUploading = true;
-      });
-
-      // Upload via generic uploadFile
-      final url = await _uploadService.uploadFile(file.bytes!, file.name);
-
-      if (url != null && !url.contains('SIZE_LIMIT_EXCEEDED')) {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          final chatId = RealtimeService.chatId(user.uid, widget.doctor.uid);
-          final message = {
-            'text': '[Tệp tin] ${file.name}', // Generic message text
-            'url': url,
-            'senderId': user.uid,
-            'senderName': user.displayName ?? '',
-            'otherId': widget.doctor.uid,
-            'timestamp': ServerValue.timestamp,
-            'type': 'file', // New type 'file'
-            'fileName': file.name
-          };
-          await _realtime.sendMessage(
-            chatId,
-            message,
-            otherName: widget.doctor.name,
-            otherImage: widget.doctor.imagePath,
-            myName: user.displayName ?? 'User',
-          );
-        }
-      } else if (url == 'SIZE_LIMIT_EXCEEDED') {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("File quá lớn! Vui lòng chọn < 10MB")));
-      } else {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text("Gửi file thất bại.")));
-      }
-    } catch (e) {
-      debugPrint("Pick file error: $e");
-    } finally {
-      if (mounted) setState(() => _isUploading = false);
-    }
+    await viewModel.sendFile(
+      chatId: chatId,
+      senderId: currentUid,
+      otherId: widget.doctor.uid,
+      myName: currentUserName,
+      otherName: widget.doctor.name,
+      otherImage: widget.doctor.imagePath,
+    );
   }
 
   // --- Helpers ---
@@ -860,12 +907,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 TextButton(
                     onPressed: () async {
                       Navigator.pop(ctx);
-                      final newText = editCtrl.text.trim();
-                      if (newText.isNotEmpty && newText != msg.text) {
-                        final chatId = RealtimeService.chatId(
-                            currentUid, widget.doctor.uid);
-                        await _realtime.updateMessage(chatId, msg.key, newText);
-                      }
+                      // TODO: Implement updateMessage in ViewModel
+                      // final newText = editCtrl.text.trim();
+                      // if (newText.isNotEmpty && newText != msg.text) {
+                      //   final viewModel = context.read<ChatViewModel>();
+                      //   await viewModel.updateMessage(...)
+                      // }
                     },
                     child: Text("Lưu")),
               ],
@@ -885,9 +932,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 TextButton(
                     onPressed: () async {
                       Navigator.pop(ctx);
+                      final viewModel = context.read<ChatViewModel>();
                       final chatId =
-                          RealtimeService.chatId(currentUid, widget.doctor.uid);
-                      await _realtime.deleteMessage(chatId, msg.key);
+                          viewModel.getChatId(currentUid, widget.doctor.uid);
+                      await viewModel.deleteMessage(chatId, msg.key);
                     },
                     child: Text("Xóa", style: TextStyle(color: Colors.red))),
               ],

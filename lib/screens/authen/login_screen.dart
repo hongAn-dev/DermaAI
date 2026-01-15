@@ -1,8 +1,9 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../../view_models/auth_view_model.dart';
 import 'package:myapp/utils/color_utils.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -19,46 +20,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscureText = true;
   String _errorMessage = '';
 
-  // --- HÀM 1: GỬI YÊU CẦU RESET PASS ---
-  Future<void> _sendResetEmail(String email) async {
-    try {
-      // Hiện loading dialog
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
-      );
-
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email.trim());
-
-      if (!mounted) return;
-      Navigator.of(context).pop(); // Tắt loading
-      Navigator.of(context).pop(); // Tắt dialog nhập email
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Đã gửi link đổi mật khẩu tới $email'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      Navigator.of(context).pop(); // Tắt loading
-
-      String msg = 'Lỗi không xác định';
-      if (e.code == 'user-not-found') msg = 'Email này chưa đăng ký tài khoản.';
-      if (e.code == 'invalid-email') msg = 'Email không hợp lệ.';
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), backgroundColor: Colors.red),
-      );
-    }
-  }
-
-  // --- HÀM 2: HIỆN HỘP THOẠI NHẬP EMAIL ---
   void _showForgotPasswordDialog() {
     final resetEmailController = TextEditingController();
-    // Tự động điền email nếu người dùng đã nhập ở màn hình ngoài
     if (_emailController.text.isNotEmpty) {
       resetEmailController.text = _emailController.text;
     }
@@ -90,44 +53,52 @@ class _LoginScreenState extends State<LoginScreen> {
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
           ),
-          ElevatedButton(
-            onPressed: () {
-              if (resetEmailController.text.isEmpty) return;
-              _sendResetEmail(resetEmailController.text);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF18A0FB),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Gửi yêu cầu'),
-          ),
+          Consumer<AuthViewModel>(builder: (context, authVM, child) {
+            if (authVM.isLoading) return const CircularProgressIndicator();
+            return ElevatedButton(
+              onPressed: () async {
+                if (resetEmailController.text.isEmpty) return;
+                // We need to call VM and then close dialog
+                // But VM usage inside dialog needs context or provider access.
+                // Since we are inside Consumer, we can call authVM directly.
+                final success =
+                    await authVM.sendPasswordReset(resetEmailController.text);
+                if (context.mounted) {
+                  if (success) {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text("Đã gửi email khôi phục"),
+                        backgroundColor: Colors.green));
+                  } else {
+                    // Error message handled in SnackBar mostly, or we can show here
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF18A0FB),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Gửi yêu cầu'),
+            );
+          }),
         ],
       ),
     );
   }
 
   Future<void> _login() async {
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+    final success = await context.read<AuthViewModel>().login(
+          _emailController.text.trim(),
+          _passwordController.text.trim(),
+        );
 
-      if (!mounted) return;
+    if (!mounted) return;
 
+    if (success) {
       context.go('/home');
-    } on FirebaseAuthException catch (e) {
+    } else {
       setState(() {
-        // Việt hóa một vài lỗi phổ biến
-        if (e.code == 'user-not-found' ||
-            e.code == 'wrong-password' ||
-            e.code == 'invalid-credential') {
-          _errorMessage = 'Email hoặc mật khẩu không chính xác.';
-        } else if (e.code == 'invalid-email') {
-          _errorMessage = 'Định dạng email không hợp lệ.';
-        } else {
-          _errorMessage = e.message ?? 'Đã xảy ra lỗi.';
-        }
+        // Force rebuild to show error message from VM
       });
     }
   }

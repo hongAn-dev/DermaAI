@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart' hide Query;
 import 'package:go_router/go_router.dart'; // Đừng quên import package này
 import 'package:myapp/utils/responsive.dart';
 import 'chat_screen.dart';
-import '../../models/doctor.dart';
+import '../../data/models/doctor_model.dart';
 
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
