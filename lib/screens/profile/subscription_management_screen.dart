@@ -30,12 +30,12 @@ class SubscriptionManagementScreen extends StatelessWidget {
           children: [
             _buildCurrentPlanCard(),
             const SizedBox(height: 32),
-            _buildSectionTitle('Your Plan Benefits'),
-            _buildBenefitItem(Icons.all_inclusive, 'Unlimited AI Scans'),
+            _buildSectionTitle('Quyền lợi theo gói bảo hiểm của bạn'),
+            _buildBenefitItem(Icons.all_inclusive, 'Quét AI không giới hạn'),
             _buildBenefitItem(Icons.health_and_safety_outlined,
-                'Monthly Expert Consultation'),
-            _buildBenefitItem(Icons.history_toggle_off, 'Scan History Storage'),
-            _buildBenefitItem(Icons.support_agent, 'Priority Support'),
+                'Tư vấn chuyên gia hàng tháng'),
+            _buildBenefitItem(Icons.history_toggle_off, 'Lưu trữ lịch sử quét'),
+            _buildBenefitItem(Icons.support_agent, 'Hỗ trợ ưu tiên'),
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: () {},
@@ -48,27 +48,27 @@ class SubscriptionManagementScreen extends StatelessWidget {
                 textStyle: GoogleFonts.manrope(
                     fontWeight: FontWeight.bold, fontSize: 16),
               ),
-              child: const Text('Upgrade Plan'),
+              child: const Text('Kế hoạch nâng cấp'),
             ),
             const SizedBox(height: 24),
             Center(
                 child: TextButton(
                     onPressed: () {},
-                    child: Text('Manage Payment Methods',
+                    child: Text('Quản lý phương thức thanh toán',
                         style: GoogleFonts.manrope(
                             color: Colors.grey[700],
                             fontWeight: FontWeight.w500)))),
             Center(
                 child: TextButton(
                     onPressed: () {},
-                    child: Text('Transaction History',
+                    child: Text('Lịch sử giao dịch',
                         style: GoogleFonts.manrope(
                             color: Colors.grey[700],
                             fontWeight: FontWeight.w500)))),
             Center(
                 child: TextButton(
                     onPressed: () {},
-                    child: Text('Cancel Subscription',
+                    child: Text('Hủy đăng ký',
                         style: GoogleFonts.manrope(
                             color: Colors.red, fontWeight: FontWeight.w500)))),
           ],
@@ -90,11 +90,11 @@ class SubscriptionManagementScreen extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Premium Plan',
+                Text('Gói cao cấp',
                     style: GoogleFonts.manrope(
                         fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text('Renews on Dec 25, 2024',
+                Text('Gia hạn vào ngày 25 tháng 12 năm 2024',
                     style: GoogleFonts.manrope(color: Colors.grey[600])),
               ],
             ),
@@ -104,7 +104,7 @@ class SubscriptionManagementScreen extends StatelessWidget {
                 color: Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text('Active',
+              child: Text('Kích hoạt',
                   style: GoogleFonts.manrope(
                       color: Colors.blue.shade800,
                       fontWeight: FontWeight.bold)),

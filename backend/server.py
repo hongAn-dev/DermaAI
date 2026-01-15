@@ -1,0 +1,204 @@
+from fastapi import FastAPI, File, UploadFile
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from PIL import Image
+import numpy as np
+import io
+import tensorflow as tf
+import base64
+import cv2
+
+app = FastAPI()
+
+# ==========================================
+# ⚙️ CẤU HÌNH CORS
+# ==========================================
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ==========================================
+# ⚙️ CẤU HÌNH MODEL
+# ==========================================
+MODEL_FILE = "skin_vgg16_model.keras"
+IMG_SIZE = (224, 224)
+INNER_MODEL_NAME = "vgg16"
+LAST_CONV_LAYER_NAME = "block5_conv3"
+
+CLASS_NAMES = [
+    'Actinic keratoses (akiec)',
+    'Basal cell carcinoma (bcc)',
+    'Benign keratosis-like lesions (bkl)',
+    'Dermatofibroma (df)',
+    'Melanoma (mel)',
+    'Melanocytic nevi (nv)',
+    'Vascular lesions (vasc)'
+]
+
+print(f"⏳ Đang tải model: {MODEL_FILE}...")
+try:
+    model = tf.keras.models.load_model(MODEL_FILE)
+    print("✅ Model tải thành công!")
+except Exception as e:
+    print(f"❌ LỖI Tải Model: {e}")
+    model = None
+
+# --- HÀM TÍNH GRAD-CAM (Dựa trên HEATMAP.py) ---
+def compute_gradcam(model, img_array, class_index, inner_layer_name="vgg16", conv_layer_name="block5_conv3"):
+    try:
+        # Lấy model con VGG16
+        inner_model = model.get_layer(inner_layer_name)
+        
+        # Tạo grad_model từ input của model con -> [conv_output, model_output]
+        grad_model = tf.keras.models.Model(
+            inputs=inner_model.input,
+            outputs=[inner_model.get_layer(conv_layer_name).output, inner_model.output]
+        )
+
+        with tf.GradientTape() as tape:
+            # Tính toán trên model con
+            conv_outputs, predictions = grad_model(img_array)
+            
+            # Logic Activation Map (An toàn nhất cho model lồng)
+            # Lấy trung bình các feature map
+            loss = predictions[:, class_index]
+
+        # Tính gradient của loss theo output của conv layer
+        grads = tape.gradient(loss, conv_outputs)
+
+        # Tính global average pooling của gradients
+        pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+
+        # Nhân feature map với weight (pooled gradients)
+        heatmap = conv_outputs[0] @ pooled_grads[..., tf.newaxis]
+        heatmap = tf.squeeze(heatmap)
+
+        # QUAY VỀ LOGIC ACTIVATION MAP
+        heatmap = tf.maximum(heatmap, 0)
+        
+        max_val = tf.math.reduce_max(heatmap)
+        if max_val == 0: return heatmap.numpy()
+        
+        heatmap = heatmap / max_val
+        return heatmap.numpy()
+
+    except Exception as e:
+        print(f"⚠️ Lỗi tính Heatmap: {e}")
+        return np.zeros((IMG_SIZE[0], IMG_SIZE[1]))
+
+def overlay_heatmap_cv2(img_pil, heatmap, alpha=0.4):
+    """
+    Hàm chồng ảnh dùng OpenCV (đã sửa lỗi màu sắc)
+    """
+    try:
+        # 1. Chuyển PIL (RGB) sang NumPy (RGB)
+        img = np.array(img_pil)
+        
+        # 2. Resize heatmap về kích thước ảnh gốc
+        heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[0]))
+        
+        # 3. Chuẩn hóa heatmap sang 0-255 (uint8)
+        heatmap = np.uint8(255 * heatmap)
+        
+        # 4. Tạo bản đồ màu (ColorMap)
+        # Lưu ý: applyColorMap trả về BGR theo chuẩn OpenCV
+        heatmap_colored = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+        
+        # 5. Chuyển Heatmap từ BGR sang RGB để khớp với ảnh gốc (PIL)
+        heatmap_colored = cv2.cvtColor(heatmap_colored, cv2.COLOR_BGR2RGB)
+        
+        # 6. Pha trộn (Blend)
+        # img là RGB, heatmap_colored cũng là RGB -> Kết quả đúng màu
+        superimposed_img = cv2.addWeighted(img, alpha, heatmap_colored, 1 - alpha, 0)
+        
+        # 7. Trả về PIL Image
+        return Image.fromarray(superimposed_img)
+        
+    except Exception as e:
+        print(f"Lỗi overlay: {e}")
+        return img_pil # Trả về ảnh gốc nếu lỗi
+
+def pil_image_to_base64(image):
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+@app.get("/")
+def home():
+    return {"status": "Skin-AI Server Running (Fixed Color Logic)"}
+
+@app.post("/explain")
+async def explain_image(file: UploadFile = File(...)):
+    if model is None:
+        return JSONResponse(content={"error": "Model chưa tải"}, status_code=500)
+
+    try:
+        # 1. Đọc và Tiền xử lý (Code xử lý ảnh đầu vào)
+        image_data = await file.read()
+        image_pil = Image.open(io.BytesIO(image_data)).convert("RGB")
+        img_tensor = image_pil.resize(IMG_SIZE)
+        img_array = np.array(img_tensor)
+        img_array = np.expand_dims(img_array, axis=0) / 255.0
+
+        print(f"🔍 Phân tích ảnh shape: {img_array.shape}")
+
+        # 2. Dự đoán (Code Predict)
+        predictions = model.predict(img_array)
+        scores = predictions[0]
+        predicted_index = np.argmax(scores)
+        predicted_class = CLASS_NAMES[predicted_index]
+        confidence = float(scores[predicted_index])
+
+        # Chi tiết
+        detailed_results = []
+        for i, score in enumerate(scores):
+            detailed_results.append({
+                "disease": CLASS_NAMES[i],
+                "probability": float(score) * 100,
+                "score": float(score)
+            })
+        detailed_results.sort(key=lambda x: x["probability"], reverse=True)
+
+        # 3. Tạo Heatmap
+        heatmap = compute_gradcam(
+            model,
+            img_array,
+            predicted_index,
+            inner_layer_name=INNER_MODEL_NAME,
+            conv_layer_name=LAST_CONV_LAYER_NAME
+        )
+        
+        # Overlay: Dùng ảnh gốc đã resize để hiển thị đẹp
+        display_img = image_pil.resize(IMG_SIZE)
+        result_img = overlay_heatmap_cv2(display_img, heatmap, alpha=0.4)
+
+        # Base64
+        heatmap_base64_str = pil_image_to_base64(result_img)
+
+        # 4. Trả về JSON (Code hiển thị kết quả)
+        return JSONResponse(content={
+            "status": "success",
+            "prediction": {
+                "class": predicted_class,
+                "confidence": f"{confidence * 100:.2f}%",
+                "confidence_score": confidence
+            },
+            "details": detailed_results,
+            "heatmap_image": heatmap_base64_str
+        })
+
+    except Exception as e:
+        print(f"❌ Lỗi Xử lý Server: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

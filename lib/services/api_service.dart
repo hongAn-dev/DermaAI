@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -7,11 +6,24 @@ import 'package:firebase_auth/firebase_auth.dart';
 // Import the centralized data models instead of defining them here
 import 'package:myapp/models/analysis_model.dart';
 
+import 'package:flutter/foundation.dart';
+
 // --- API Service Class ---
 
 class ApiService {
-  // NOTE: This Ngrok URL is temporary. For production, you should use a permanent server URL.
-  static const String _baseUrl = 'https://nannette-suppositious-brayan.ngrok-free.dev';
+  // NOTE: This assumes the backend is running locally on port 8000.
+  // Use 10.0.2.2 for Android emulator to access host localhost.
+  static String get _baseUrl {
+    if (kIsWeb) return 'http://localhost:8000';
+    try {
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        return 'http://10.0.2.2:8000';
+      }
+    } catch (_) {
+      // defaultTargetPlatform might throw/not work in some edge/test environments, fallback to localhost
+    }
+    return 'http://localhost:8000';
+  }
 
   /// Analyzes an image by sending it to the backend server.
   ///
@@ -29,12 +41,13 @@ class ApiService {
     final request = http.MultipartRequest('POST', uri);
 
     final imageBytes = await imageFile.readAsBytes();
-    
+
     // Create a unique filename for the image to avoid potential conflicts.
-    final imageName = '${DateTime.now().millisecondsSinceEpoch}_${imageFile.name}';
+    final imageName =
+        '${DateTime.now().millisecondsSinceEpoch}_${imageFile.name}';
 
     final multipartFile = http.MultipartFile.fromBytes(
-      'file', 
+      'file',
       imageBytes,
       filename: imageName,
     );

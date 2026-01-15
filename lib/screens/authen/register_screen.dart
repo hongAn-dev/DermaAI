@@ -106,7 +106,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       context.go('/home');
     } on FirebaseAuthException catch (e) {
       setState(() {
-        _errorMessage = e.message ?? 'An unknown error occurred.';
+        _errorMessage = e.message ?? 'Đã xảy ra lỗi không xác định.';
       });
     }
   }
@@ -191,13 +191,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     DropdownButtonFormField<String>(
                       initialValue: _role,
                       items: const [
-                        DropdownMenuItem(value: 'user', child: Text('User')),
+                        DropdownMenuItem(value: 'user', child: Text('Người dùng')),
                         DropdownMenuItem(
-                            value: 'doctor', child: Text('Doctor')),
+                            value: 'doctor', child: Text('Bác sĩ')),
                       ],
                       onChanged: (v) => setState(() => _role = v ?? 'user'),
                       decoration: InputDecoration(
-                        labelText: 'Role',
+                        labelText: 'Vai trò',
                         border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8)),
                         filled: true,

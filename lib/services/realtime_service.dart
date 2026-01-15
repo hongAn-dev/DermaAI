@@ -25,7 +25,8 @@ class RealtimeService {
     return _db.ref('chats/$chatId/messages').orderByChild('timestamp').onValue;
   }
 
-  Future<void> sendMessage(String chatId, Map<String, dynamic> message) async {
+  Future<void> sendMessage(String chatId, Map<String, dynamic> message,
+      {String? otherName, String? otherImage, String? myName}) async {
     final ref = _db.ref('chats/$chatId/messages').push();
     await ref.set(message);
     // also update per-user chat index for quick conversation list
@@ -33,24 +34,46 @@ class RealtimeService {
       final senderId = message['senderId']?.toString() ?? '';
       final otherId = message['otherId']?.toString() ?? '';
       final timestamp = message['timestamp'] ?? ServerValue.timestamp;
+
       if (senderId.isNotEmpty) {
-        await _db.ref('user_chats/$senderId/$chatId').set({
+        final updateData = {
           'chatId': chatId,
           'otherId': otherId,
           'lastMessage': message['text'] ?? '',
           'timestamp': timestamp,
-        });
+        };
+        if (otherName != null) updateData['otherName'] = otherName;
+        if (otherImage != null) updateData['otherImage'] = otherImage;
+
+        await _db.ref('user_chats/$senderId/$chatId').update(updateData);
       }
       if (otherId.isNotEmpty) {
-        await _db.ref('user_chats/$otherId/$chatId').set({
+        final updateData = {
           'chatId': chatId,
           'otherId': senderId,
           'lastMessage': message['text'] ?? '',
           'timestamp': timestamp,
-        });
+        };
+        // For the other person, 'otherName' is MY name
+        if (myName != null) updateData['otherName'] = myName;
+
+        await _db.ref('user_chats/$otherId/$chatId').update(updateData);
       }
     } catch (e) {
       // non-fatal
     }
+  }
+
+  Future<void> deleteMessage(String chatId, String messageId) async {
+    await _db.ref('chats/$chatId/messages/$messageId').remove();
+  }
+
+  Future<void> updateMessage(
+      String chatId, String messageId, String newText) async {
+    await _db.ref('chats/$chatId/messages/$messageId').update({
+      'text': newText,
+      // optionally mark as edited
+      'isEdited': true,
+    });
   }
 }

@@ -28,7 +28,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Personal Information',
+          'Thông tin cá nhân',
           style: GoogleFonts.manrope(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 18),
         ),
         actions: [
@@ -39,7 +39,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
               });
             },
             child: Text(
-              _isEditing ? 'Cancel' : 'Edit',
+              _isEditing ? 'Hủy' : 'Chỉnh sửa',
               style: GoogleFonts.manrope(color: const Color(0xFF18A0FB), fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ),
@@ -55,10 +55,10 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
           children: [
             _buildAvatar(),
             const SizedBox(height: 32),
-            _buildTextField('Full Name', _fullNameController),
-            _buildDateField('Date of Birth', _dobController),
+            _buildTextField('Họ và tên', _fullNameController),
+            _buildDateField('Ngày sinh', _dobController),
             _buildGenderSelector(),
-            _buildTextField('Phone Number', _phoneController, readOnly: !_isEditing),
+            _buildTextField('Số điện thoại', _phoneController, readOnly: !_isEditing),
             _buildTextField('Email', _emailController, readOnly: !_isEditing),
             const SizedBox(height: 32),
             if (_isEditing)
@@ -75,7 +75,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   textStyle: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
-                child: const Text('Save Changes'),
+                child: const Text('Lưu thay đổi'),
               ),
           ],
         ),
@@ -163,10 +163,10 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Gender', style: GoogleFonts.manrope(color: Colors.grey[600], fontWeight: FontWeight.w600)),
+          Text('Giới tính', style: GoogleFonts.manrope(color: Colors.grey[600], fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Row(
-            children: ['Male', 'Female', 'Other'].map((gender) {
+            children: ['Nam', 'Nữ', 'Khác'].map((gender) {
               bool isSelected = _gender == gender;
               return Expanded(
                 child: GestureDetector(

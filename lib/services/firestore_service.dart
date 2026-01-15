@@ -15,11 +15,11 @@ class FirestoreService {
   /// Saves raw analysis data (as a Map) to the 'scan_history' collection.
   Future<void> saveRawAnalysisResult(
       String docId, Map<String, dynamic> data) async {
-    if (currentUser == null) throw Exception("User not logged in");
+    if (currentUser == null) throw Exception("Người dùng chưa đăng nhập");
     try {
       await _db.collection(_collectionName).doc(docId).set(data);
     } catch (e) {
-      print("Error saving raw analysis: \$e");
+      print("Lỗi khi lưu kết quả phân tích: \$e");
       rethrow;
     }
   }
@@ -51,7 +51,7 @@ class FirestoreService {
           disease: prediction['className'] as String? ?? 'N/A',
           probability:
               (prediction['confidenceScore'] as num?)?.toDouble() ?? 0.0,
-          recommendation: "Consult a dermatologist for a professional opinion.",
+          recommendation: "Tham khảo ý kiến bác sĩ da liễu để được chẩn đoán chuyên môn.",
           imageUrl: data['imagePath'] as String? ?? '', // Will be empty
           timestamp: (scanResult['timestamp'] as Timestamp? ?? Timestamp.now())
               .toDate(),

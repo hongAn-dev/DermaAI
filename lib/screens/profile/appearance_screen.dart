@@ -23,7 +23,7 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Appearance',
+          'Giao diện',
           style: GoogleFonts.manrope(
               fontWeight: FontWeight.bold,
               color: Colors.black,
@@ -38,25 +38,25 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionTitle('APPEARANCE'),
+            _buildSectionTitle('GIAO DIỆN'),
             _buildSettingsCard([
-              _buildSwitchTile(
+                _buildSwitchTile(
                   Icons.dark_mode_outlined,
-                  'Dark Mode',
+                  'Chế độ tối',
                   appearance.darkMode,
                   (value) => appearance.setDarkMode(value)),
-              _buildNavigationTile(Icons.color_lens_outlined, 'Accent Color'),
-              _buildToggleTile(Icons.touch_app_outlined, 'Icon Style'),
+                _buildNavigationTile(Icons.color_lens_outlined, 'Màu chủ đạo'),
+                _buildToggleTile(Icons.touch_app_outlined, 'Kiểu biểu tượng'),
             ]),
             const SizedBox(height: 12),
             _buildPreviewCard(),
             const SizedBox(height: 24),
-            _buildSectionTitle('TEXT'),
+            _buildSectionTitle('VĂN BẢN'),
             _buildSettingsCard([
-              _buildSliderTile(Icons.format_size, 'Font Size'),
-              _buildSwitchTile(
+                _buildSliderTile(Icons.format_size, 'Kích thước chữ'),
+                _buildSwitchTile(
                   Icons.contrast_outlined,
-                  'High Contrast Text',
+                  'Chữ tương phản cao',
                   appearance.highContrast,
                   (value) => appearance.setHighContrast(value)),
             ]),
@@ -168,13 +168,13 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
           constraints: BoxConstraints(
               minHeight: Responsive.scale(context, 32),
               minWidth: Responsive.scale(context, 60)),
-          children: const [
+            children: const [
             Padding(
                 padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Text('Outlined')),
+                child: Text('Viền')),
             Padding(
                 padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Text('Filled'))
+                child: Text('Đậm'))
           ],
         );
       }),
@@ -258,13 +258,13 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Preview Title',
+                    Text('Tiêu đề xem trước',
                       style: GoogleFonts.manrope(
                           fontSize: appearance.fontSize + 2,
                           fontWeight: FontWeight.w600,
                           color: textColor)),
                   SizedBox(height: Responsive.scale(context, 6)),
-                  Text('This is a preview of text appearance and contrast.',
+                    Text('Đây là bản xem trước cỡ chữ và tương phản.',
                       style: GoogleFonts.manrope(
                           fontSize: appearance.fontSize, color: textColor)),
                 ],
@@ -296,10 +296,10 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
       0xFF4CAF50,
     ];
 
-    await showDialog<void>(
+        await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Choose Accent Color', style: GoogleFonts.manrope()),
+        title: Text('Chọn màu chủ đạo', style: GoogleFonts.manrope()),
         content: SizedBox(
           width: double.maxFinite,
           child: GridView.count(
@@ -328,7 +328,7 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
         actions: [
           TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: Text('Cancel', style: GoogleFonts.manrope())),
+              child: Text('Hủy', style: GoogleFonts.manrope())),
         ],
       ),
     );

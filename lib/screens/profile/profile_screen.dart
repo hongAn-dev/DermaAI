@@ -17,36 +17,36 @@ class ProfileScreen extends StatelessWidget {
       'ACCOUNT': [
         {
           'icon': Icons.person_outline,
-          'title': 'Personal Information',
+          'title': 'Thông tin cá nhân',
           'route': '/profile/personal_information'
         },
         {
           'icon': Icons.subscriptions_outlined,
-          'title': 'Subscription Management',
+          'title': 'Quản lý đăng ký',
           'route': '/profile/subscription'
         },
       ],
       'PREFERENCES': [
         {
           'icon': Icons.palette_outlined,
-          'title': 'Appearance',
+          'title': 'Giao diện',
           'route': '/profile/appearance'
         },
       ],
       'SECURITY & PRIVACY': [
         {
           'icon': Icons.lock_outline,
-          'title': 'Change Password',
+          'title': 'Thay đổi mật khẩu',
           'route': '/profile/change_password'
         },
         {
           'icon': Icons.shield_outlined,
-          'title': 'Privacy Policy',
+          'title': 'Chính sách bảo mật',
           'route': '/profile/privacy_policy'
         },
         {
           'icon': Icons.article_outlined,
-          'title': 'Terms of Service',
+          'title': 'Điều khoản dịch vụ',
           'route': '/profile/terms_of_service'
         },
       ],
@@ -62,7 +62,7 @@ class ProfileScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          'Profile & Settings',
+          'Hồ sơ & Cài đặt',
           style: GoogleFonts.manrope(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -220,7 +220,7 @@ class ProfileScreen extends StatelessWidget {
           context.go('/login');
         },
         child: Text(
-          'Log Out',
+          'Đăng xuất',
           style: GoogleFonts.manrope(
             color: Colors.red,
             fontSize: Responsive.fontSize(context, 16),

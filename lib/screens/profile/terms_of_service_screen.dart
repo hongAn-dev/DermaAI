@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -15,8 +14,9 @@ class TermsOfServiceScreen extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Terms of Service',
-          style: GoogleFonts.manrope(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 18),
+          'Điều Khoản Dịch Vụ',
+          style: GoogleFonts.manrope(
+              fontWeight: FontWeight.bold, color: Colors.black, fontSize: 18),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -27,27 +27,36 @@ class TermsOfServiceScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Last Updated: October 23, 2023', style: GoogleFonts.manrope(color: Colors.grey[600])),
+            Text('Cập nhật lần cuối: 23 Tháng 10, 2023',
+                style: GoogleFonts.manrope(color: Colors.grey[600])),
             const SizedBox(height: 16),
-            _buildExpansionTile('Introduction', 'This document serves as a binding agreement...'),
-            _buildExpansionTile('Privacy', 'Our Privacy Policy, which is available on our website, explains how we collect, use, and protect your personal information...'),
-            _buildExpansionTile('User Responsibilities', 'You agree to use this application only for lawful purposes and in a way that does not infringe the rights of, restrict, or inhibit anyone else\'s use and enjoyment of the application...'),
+            _buildExpansionTile('Giới thiệu',
+                'Tài liệu này là thỏa thuận ràng buộc giữa người dùng và nhà cung cấp dịch vụ. Bằng cách sử dụng ứng dụng, bạn đồng ý với các điều khoản được mô tả ở đây.'),
+            _buildExpansionTile('Quyền riêng tư',
+                'Chính sách Quyền riêng tư của chúng tôi (có trên trang web) giải thích cách chúng tôi thu thập, sử dụng và bảo vệ thông tin cá nhân của bạn.'),
+            _buildExpansionTile('Trách nhiệm của người dùng',
+                'Bạn đồng ý sử dụng ứng dụng chỉ cho các mục đích hợp pháp và không được hành vi làm tổn hại hoặc cản trở quyền lợi của người khác khi sử dụng ứng dụng.'),
             _buildExpansionTile(
-              'Scope of Services & AI Limitations',
-              'Our AI technology is designed to provide suggestions based on the images you provide. However, it is not a definitive medical diagnosis and may not be 100% accurate. Always seek advice from a qualified medical professional.',
+              'Phạm vi dịch vụ & Giới hạn AI',
+              'Công nghệ AI của chúng tôi cung cấp các đề xuất dựa trên hình ảnh bạn cung cấp. Tuy nhiên, kết quả không phải là chẩn đoán y tế chính thức và có thể không hoàn toàn chính xác. Luôn tham khảo ý kiến chuyên gia y tế khi cần.',
               initiallyExpanded: true,
             ),
-             _buildExpansionTile('Intellectual Property', 'All content and software associated with this application are the property of DermAI Inc. or its licensors...'),
-            _buildExpansionTile('Disclaimer of Warranties', 'The service is provided "as is" without any warranties of any kind, either express or implied...'),
-            _buildExpansionTile('Limitation of Liability', 'DermAI Inc. shall not be liable for any indirect, incidental, special, consequential or punitive damages...'),
-            _buildExpansionTile('Contact Information', 'If you have any questions about these Terms, please contact us at contact@dermai.app.'),
+            _buildExpansionTile('Sở hữu trí tuệ',
+                'Toàn bộ nội dung và phần mềm liên quan đến ứng dụng là tài sản của DermAI Inc. hoặc bên cấp phép.'),
+            _buildExpansionTile('Miễn trừ bảo đảm',
+                'Dịch vụ được cung cấp "như hiện có" mà không có bất kỳ bảo đảm nào, rõ ràng hay ngụ ý...'),
+            _buildExpansionTile('Giới hạn trách nhiệm',
+                'DermAI Inc. sẽ không chịu trách nhiệm cho bất kỳ thiệt hại gián tiếp, ngẫu nhiên, đặc biệt, hệ quả hoặc trừng phạt phát sinh...'),
+            _buildExpansionTile('Thông tin liên hệ',
+                'Nếu bạn có bất kỳ câu hỏi nào về các Điều khoản này, vui lòng liên hệ chúng tôi tại contact@dermai.app.'),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildExpansionTile(String title, String content, {bool initiallyExpanded = false}) {
+  Widget _buildExpansionTile(String title, String content,
+      {bool initiallyExpanded = false}) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 0,
@@ -55,7 +64,9 @@ class TermsOfServiceScreen extends StatelessWidget {
       color: Colors.white,
       child: ExpansionTile(
         initiallyExpanded: initiallyExpanded,
-        title: Text(title, style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16)),
+        title: Text(title,
+            style:
+                GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16)),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

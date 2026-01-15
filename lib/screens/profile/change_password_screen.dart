@@ -112,8 +112,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   children: [
                     _buildPasswordField(
                       controller: _currentPassController,
-                      label: 'Current Password',
-                      hint: 'Enter current password',
+                      label: 'Mật khẩu hiện tại',
+                      hint: 'Nhập mật khẩu hiện tại',
                       obscureText: _obscureCurrentPassword,
                       onToggle: () => setState(() =>
                           _obscureCurrentPassword = !_obscureCurrentPassword),
@@ -124,8 +124,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     const SizedBox(height: 16),
                     _buildPasswordField(
                       controller: _newPassController,
-                      label: 'New Password',
-                      hint: 'Enter new password',
+                      label: 'Mật khẩu mới',
+                      hint: 'Nhập mật khẩu mới',
                       obscureText: _obscureNewPassword,
                       onToggle: () => setState(
                           () => _obscureNewPassword = !_obscureNewPassword),
@@ -140,8 +140,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     const SizedBox(height: 24),
                     _buildPasswordField(
                       controller: _confirmPassController,
-                      label: 'Confirm New Password',
-                      hint: 'Confirm new password',
+                      label: 'Xác nhận mật khẩu mới',
+                      hint: 'Nhập mật khẩu mới',
                       obscureText: _obscureConfirmPassword,
                       onToggle: () => setState(() =>
                           _obscureConfirmPassword = !_obscureConfirmPassword),
@@ -154,7 +154,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Password must be at least 6 characters long.',
+                      'Mật khẩu phải có ít nhất 6 ký tự.',
                       style: GoogleFonts.manrope(
                           color: Colors.grey[600], fontSize: 13),
                     ),
@@ -178,7 +178,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                               width: 20,
                               child: CircularProgressIndicator(
                                   color: Colors.white, strokeWidth: 2))
-                          : const Text('Save Changes'),
+                          : const Text('Lưu thay đổi'),
                     ),
                   ],
                 ),

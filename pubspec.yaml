@@ -30,6 +30,10 @@ dependencies:
 
   # Thư viện Zego Call
   zego_uikit_prebuilt_call: ^4.22.2
+  file_picker: ^10.3.8
+  url_launcher: ^6.3.2
+  flutter_linkify: ^6.0.0
+  flutter_slidable: ^4.0.3
 
 dev_dependencies:
   flutter_test:
@@ -44,4 +48,4 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/default_avatar.png
+    - assets/images/

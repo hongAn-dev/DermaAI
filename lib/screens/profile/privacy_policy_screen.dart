@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -16,7 +15,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
         ),
         title: Text(
           'Privacy Policy',
-          style: GoogleFonts.manrope(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 18),
+          style: GoogleFonts.manrope(
+              fontWeight: FontWeight.bold, color: Colors.black, fontSize: 18),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -27,36 +27,23 @@ class PrivacyPolicyScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Last Updated: May 24, 2024', style: GoogleFonts.manrope(color: Colors.grey[600])),
+            Text('Cập nhật lần cuối: ngày 24 tháng 5 năm 2024',
+                style: GoogleFonts.manrope(color: Colors.grey[600])),
             const SizedBox(height: 24),
-            _buildSection(
-              'Introduction',
-              'This policy describes how we collect, use, and protect your personal information when you use our AI dermatological diagnosis application.'
-            ),
-            _buildSection(
-              '1. Information Collection',
-              'We collect information you provide directly to us, such as when you create an account, upload images for analysis, or contact us for support. This information may include your name, email address, and dermatological images.'
-            ),
-            _buildSection(
-              '2. Use of Information',
-              'Your information is used to provide and improve our services, train our AI models, and communicate with you about important updates. We are committed to anonymizing image data used for research purposes.'
-            ),
-            _buildSection(
-              '3. Data Sharing and Disclosure',
-              'We do not sell your personal information. Data may be shared with research partners or third-party service providers under strict confidentiality agreements.'
-            ),
-            _buildSection(
-              '4. Data Security',
-              'We implement technical and organizational security measures to protect your data from unauthorized access, alteration, or destruction.'
-            ),
-            _buildSection(
-              '5. User Rights',
-              'You have the right to access, modify, or delete your personal information. You can exercise these rights through your account settings or by contacting us.'
-            ),
-            _buildSection(
-              '6. Contact Us',
-              'If you have any questions about this privacy policy, please contact us via email: privacy@skinai.app.'
-            ),
+            _buildSection('Giới thiệu',
+                'Chính sách này mô tả cách chúng tôi thu thập, sử dụng và bảo vệ thông tin cá nhân của bạn khi bạn sử dụng ứng dụng chẩn đoán da liễu bằng trí tuệ nhân tạo của chúng tôi.'),
+            _buildSection('1. Thu thập thông tin',
+                'Chúng tôi thu thập thông tin mà bạn cung cấp trực tiếp cho chúng tôi, chẳng hạn như khi bạn tạo tài khoản, tải hình ảnh lên để phân tích hoặc liên hệ với chúng tôi để được hỗ trợ. Thông tin này có thể bao gồm tên, địa chỉ email và hình ảnh da liễu của bạn.'),
+            _buildSection('2. Sử dụng thông tin',
+                'Thông tin của bạn được sử dụng để cung cấp và cải thiện dịch vụ của chúng tôi, huấn luyện các mô hình AI và liên lạc với bạn về các bản cập nhật quan trọng. Chúng tôi cam kết ẩn danh dữ liệu hình ảnh được sử dụng cho mục đích nghiên cứu.'),
+            _buildSection('3. Chia sẻ và tiết lộ dữ liệu',
+                'Chúng tôi không bán thông tin cá nhân của bạn. Dữ liệu có thể được chia sẻ với các đối tác nghiên cứu hoặc nhà cung cấp dịch vụ bên thứ ba theo các thỏa thuận bảo mật nghiêm ngặt.'),
+            _buildSection('4. Bảo mật dữ liệu',
+                'Chúng tôi áp dụng các biện pháp bảo mật kỹ thuật và tổ chức để bảo vệ dữ liệu của bạn khỏi sự truy cập, sửa đổi hoặc phá hủy trái phép.'),
+            _buildSection('5. Quyền của người dùng',
+                'Bạn có quyền truy cập, chỉnh sửa hoặc xóa thông tin cá nhân của mình. Bạn có thể thực hiện các quyền này thông qua cài đặt tài khoản hoặc bằng cách liên hệ với chúng tôi.'),
+            _buildSection('6. Liên hệ với chúng tôi',
+                'Nếu bạn có bất kỳ thắc mắc nào về chính sách bảo mật này, vui lòng liên hệ với chúng tôi qua email: privacy@skinai.app.'),
           ],
         ),
       ),
@@ -71,12 +58,16 @@ class PrivacyPolicyScreen extends StatelessWidget {
         children: [
           Text(
             title,
-            style: GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black87),
+            style: GoogleFonts.manrope(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: Colors.black87),
           ),
           const SizedBox(height: 8),
           Text(
             content,
-            style: GoogleFonts.manrope(fontSize: 15, color: Colors.grey[700], height: 1.5),
+            style: GoogleFonts.manrope(
+                fontSize: 15, color: Colors.grey[700], height: 1.5),
           ),
         ],
       ),

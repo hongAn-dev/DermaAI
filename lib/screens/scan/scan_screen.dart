@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:myapp/utils/color_utils.dart';
+
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/models/analysis_model.dart';
@@ -16,12 +16,35 @@ class ScanScreen extends StatefulWidget {
   State<ScanScreen> createState() => _ScanScreenState();
 }
 
-class _ScanScreenState extends State<ScanScreen> {
+class _ScanScreenState extends State<ScanScreen> with TickerProviderStateMixin {
   final ImagePicker _picker = ImagePicker();
   final ApiService _apiService = ApiService();
   XFile? _image;
   Uint8List? _imageBytes;
   bool _isAnalyzing = false;
+  late AnimationController _controller;
+  late AnimationController _scanningController;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _scanningController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scanningController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickImage(ImageSource source) async {
     try {
@@ -37,7 +60,7 @@ class _ScanScreenState extends State<ScanScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to pick image: $e')),
+        SnackBar(content: Text('Lấy ảnh thất bại: $e')),
       );
     }
   }
@@ -45,7 +68,7 @@ class _ScanScreenState extends State<ScanScreen> {
   Future<void> _analyzeImage() async {
     if (_image == null || _imageBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an image first!')),
+        const SnackBar(content: Text('Vui lòng chọn ảnh trước!')),
       );
       return;
     }
@@ -61,7 +84,7 @@ class _ScanScreenState extends State<ScanScreen> {
       if (!mounted) return;
 
       if (result != null) {
-        Navigator.push(
+        final shouldReset = await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => AnalysisResultsScreen(
@@ -70,23 +93,30 @@ class _ScanScreenState extends State<ScanScreen> {
             ),
           ),
         );
+
+        if (shouldReset == true && mounted) {
+          setState(() {
+            _image = null;
+            _imageBytes = null;
+          });
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Analysis failed. No result was returned.')),
+              content: Text('Phân tích thất bại. Không có kết quả trả về.')),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error in analyzeImage: $e')),
+        SnackBar(content: Text('Lỗi khi phân tích ảnh: $e')),
       );
     } finally {
       if (mounted) {
         setState(() {
           _isAnalyzing = false;
-          _image = null;
-          _imageBytes = null;
+          // _image = null; // Optional: Keep image to allow re-try
+          // _imageBytes = null;
         });
       }
     }
@@ -95,191 +125,367 @@ class _ScanScreenState extends State<ScanScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back,
+              color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => context.go('/home'),
         ),
         title: Text(
-          'New Analysis',
+          'Phân tích da AI',
           style: GoogleFonts.manrope(
               fontWeight: FontWeight.bold,
-              color: Colors.black,
-              fontSize: Responsive.fontSize(context, 18)),
+              fontSize: Responsive.fontSize(context, 18),
+              color: Theme.of(context).colorScheme.onSurface),
         ),
         centerTitle: true,
-        backgroundColor: const Color(0xFFF8F9FA),
+        backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: _imageBytes == null
-          ? _buildSelectionScreen()
-          : _buildAnalysisScreen(),
-    );
-  }
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWeb = constraints.maxWidth > 800;
+          final content = _imageBytes == null
+              ? _buildScannerInterface()
+              : _buildAnalysisInterface();
 
-  Widget _buildSelectionScreen() {
-    // FIX: Wrapped the content in a SingleChildScrollView to prevent overflow on smaller screens.
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      child: Padding(
-        padding:
-            EdgeInsets.symmetric(horizontal: Responsive.scale(context, 24.0)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: Responsive.scale(context, 20)),
-            Text(
-              'Analyze Your Skin',
-              style: GoogleFonts.manrope(
-                fontSize: Responsive.fontSize(context, 28),
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF212529),
-              ),
-            ),
-            SizedBox(height: Responsive.scale(context, 8)),
-            Text(
-              'Upload a clear, well-lit photo of the skin area for an AI-powered analysis.',
-              style: GoogleFonts.manrope(
-                fontSize: Responsive.fontSize(context, 16),
-                color: const Color(0xFF6C757D),
-              ),
-            ),
-            SizedBox(height: Responsive.scale(context, 40)),
-            _buildOptionCard(
-              icon: Icons.camera_alt_outlined,
-              label: 'Take a photo',
-              onTap: () => _pickImage(ImageSource.camera),
-            ),
-            SizedBox(height: Responsive.scale(context, 20)),
-            _buildOptionCard(
-              icon: Icons.photo_library_outlined,
-              label: 'Upload from Gallery',
-              onTap: () => _pickImage(ImageSource.gallery),
-            ),
-            SizedBox(
-                height: Responsive.scale(
-                    context, 60)), // Replaced Spacer with a flexible SizedBox
-            Padding(
-              padding: EdgeInsets.only(bottom: Responsive.scale(context, 24.0)),
-              child: Text(
-                'This AI analysis is not a substitute for professional medical advice. Always consult a healthcare provider.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.manrope(
-                  fontSize: Responsive.fontSize(context, 12),
-                  color: const Color(0xFF6C757D),
+          if (isWeb) {
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: Center(child: content),
+                    ),
+                    Container(
+                      width: 1,
+                      height: double.infinity,
+                      margin: const EdgeInsets.symmetric(vertical: 40),
+                      color: Colors.grey.withOpacity(0.2),
+                    ),
+                    Expanded(
+                      flex: 4,
+                      child: Padding(
+                        padding: EdgeInsets.all(Responsive.scale(context, 32)),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Hướng dẫn chụp',
+                              style: GoogleFonts.manrope(
+                                fontSize: Responsive.fontSize(context, 24),
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            _buildInstructionStep(context, '1',
+                                'Đảm bảo đủ ánh sáng', Icons.light_mode),
+                            const SizedBox(height: 16),
+                            _buildInstructionStep(context, '2',
+                                'Giữ camera ổn định', Icons.camera),
+                            const SizedBox(height: 16),
+                            _buildInstructionStep(
+                                context,
+                                '3',
+                                'Vùng da nằm gọn trong khung',
+                                Icons.center_focus_weak),
+                            const SizedBox(height: 40),
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.privacy_tip_outlined,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Text(
+                                      'Ảnh của bạn được mã hóa và chỉ sử dụng cho mục đích phân tích.',
+                                      style: GoogleFonts.manrope(
+                                        fontSize: 14,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
-        ),
+            );
+          } else {
+            return Center(child: content);
+          }
+        },
       ),
     );
   }
 
-  Widget _buildOptionCard(
-      {required IconData icon,
-      required String label,
-      required VoidCallback onTap}) {
-    const Color iconColor = Color(0xFF18A0FB);
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.symmetric(vertical: Responsive.scale(context, 32)),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(Responsive.scale(context, 20)),
-          boxShadow: [
-            BoxShadow(
-                color: colorWithOpacity(Colors.grey, 0.1),
-                spreadRadius: 1,
-                blurRadius: 10)
-          ],
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: Responsive.scale(context, 48), color: iconColor),
-            SizedBox(height: Responsive.scale(context, 16)),
-            Text(
-              label,
-              style: GoogleFonts.manrope(
-                fontSize: Responsive.fontSize(context, 18),
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF212529),
-              ),
+  Widget _buildInstructionStep(
+      BuildContext context, String step, String text, IconData icon) {
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            step,
+            style: GoogleFonts.manrope(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
             ),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(width: 16),
+        Icon(icon, color: Colors.grey[600], size: 20),
+        const SizedBox(width: 12),
+        Text(
+          text,
+          style: GoogleFonts.manrope(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[800],
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildAnalysisScreen() {
+  Widget _buildScannerInterface() {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
     return SingleChildScrollView(
-      padding: EdgeInsets.all(Responsive.scale(context, 24.0)),
+      padding: EdgeInsets.all(Responsive.scale(context, 24)),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
+        children: [
           Text(
-            'Your Photo',
+            'Bắt đầu kiểm tra',
             style: GoogleFonts.manrope(
-                fontSize: Responsive.fontSize(context, 22),
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF212529)),
+              fontSize: Responsive.fontSize(context, 24),
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
-          SizedBox(height: Responsive.scale(context, 20)),
-          if (_imageBytes != null)
-            ClipRRect(
-              borderRadius:
-                  BorderRadius.circular(Responsive.scale(context, 16.0)),
-              child: Image.memory(
-                _imageBytes!,
+          SizedBox(height: Responsive.scale(context, 8)),
+          Text(
+            'Đặt vùng da cần kiểm tra vào khung hình bên dưới',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.manrope(
+              fontSize: Responsive.fontSize(context, 14),
+              color: Colors.grey,
+            ),
+          ),
+          SizedBox(height: Responsive.scale(context, 40)),
+
+          // --- Pulsing Scan Zone ---
+          GestureDetector(
+            onTap: () => _pickImage(ImageSource.camera),
+            child: SizedBox(
+              width: Responsive.scale(context, 300),
+              height: Responsive.scale(context, 300),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Base pulsing circle
+                  AnimatedBuilder(
+                    animation: _controller,
+                    builder: (context, child) {
+                      return Container(
+                        width: Responsive.scale(context, 250),
+                        height: Responsive.scale(context, 250),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withOpacity(0.05),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: primaryColor
+                                .withOpacity(0.5 + (_controller.value * 0.5)),
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: primaryColor
+                                  .withOpacity(0.2 * _controller.value),
+                              blurRadius: 20 + (10 * _controller.value),
+                              spreadRadius: 5 * _controller.value,
+                            )
+                          ],
+                        ),
+                        // Add ClipOval to ensure children (laser) stay inside
+                        child: ClipOval(
+                          child: Stack(
+                            children: [
+                              // Scanning Line
+                              AnimatedBuilder(
+                                animation: _scanningController,
+                                builder: (context, child) {
+                                  return Positioned(
+                                    top: _scanningController.value *
+                                        Responsive.scale(context, 250),
+                                    left: 0,
+                                    right: 0,
+                                    child: Container(
+                                      height: 2,
+                                      decoration: BoxDecoration(
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color:
+                                                primaryColor.withOpacity(0.8),
+                                            blurRadius: 10,
+                                            spreadRadius: 2,
+                                          )
+                                        ],
+                                        color: primaryColor,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  // Camera Icon and Text (Outside ClipOval so it's not clipped if we want effects)
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.center_focus_strong,
+                          size: Responsive.scale(context, 60),
+                          color: primaryColor),
+                      SizedBox(height: Responsive.scale(context, 12)),
+                      Text('CHẠM ĐỂ CHỤP',
+                          style: GoogleFonts.manrope(
+                              fontWeight: FontWeight.bold,
+                              color: primaryColor,
+                              letterSpacing: 1.2)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          SizedBox(height: Responsive.scale(context, 40)),
+
+          // --- Alternative Button ---
+          // --- Alternative Button ---
+          OutlinedButton.icon(
+            onPressed: () => _pickImage(ImageSource.gallery),
+            icon: const Icon(Icons.photo_library),
+            label: const Text('Hoặc chọn từ thư viện'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.onSurface,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              side: BorderSide(color: Colors.grey.withOpacity(0.3)),
+              textStyle: GoogleFonts.manrope(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalysisInterface() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(Responsive.scale(context, 24)),
+      child: Column(
+        children: [
+          Container(
+            height: Responsive.scale(context, 300),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              image: DecorationImage(
+                image: MemoryImage(_imageBytes!),
                 fit: BoxFit.cover,
               ),
-            ),
-          SizedBox(height: Responsive.scale(context, 30)),
-          if (_isAnalyzing)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16.0),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.analytics_outlined, color: Colors.white),
-                onPressed: _analyzeImage,
-                label: const Text('Analyze Image'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF18A0FB),
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(
-                      vertical: Responsive.scale(context, 16)),
-                  shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(Responsive.scale(context, 12))),
-                  textStyle: TextStyle(
-                      fontSize: Responsive.fontSize(context, 16),
-                      fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-          SizedBox(height: Responsive.scale(context, 10)),
-          SizedBox(
-            width: double.infinity,
-            child: TextButton.icon(
-              icon: const Icon(Icons.refresh),
-              onPressed: () => setState(() {
-                _image = null;
-                _imageBytes = null;
-              }),
-              label: const Text('Choose a different photo'),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.grey[700],
-              ),
+              boxShadow: const [
+                BoxShadow(color: Colors.black26, blurRadius: 10)
+              ],
             ),
           ),
+          SizedBox(height: Responsive.scale(context, 32)),
+          if (_isAnalyzing)
+            Column(
+              children: [
+                CircularProgressIndicator(
+                  strokeWidth: 4,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                      Theme.of(context).colorScheme.primary),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Đang phân tích tế bào da...',
+                  style: GoogleFonts.manrope(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  'Quá trình này mất khoảng vài giây',
+                  style: GoogleFonts.manrope(color: Colors.grey),
+                ),
+              ],
+            )
+          else
+            Column(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _analyzeImage,
+                    icon: const Icon(Icons.analytics_outlined),
+                    label: const Text('BẮT ĐẦU PHÂN TÍCH'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      // Theme data handles the rest
+                    ),
+                  ),
+                ),
+                SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _image = null;
+                      _imageBytes = null;
+                    });
+                  },
+                  child: const Text('Chọn ảnh khác'),
+                ),
+              ],
+            ),
         ],
       ),
     );

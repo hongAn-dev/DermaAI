@@ -58,18 +58,40 @@ class ResponsiveScaffold extends StatelessWidget {
           builder: (context, constraints) {
             if (constraints.maxWidth < 600) {
               return Scaffold(
+                extendBody:
+                    true, // Allows body to go behind the nav bar for a continuous look
                 body: child,
-                bottomNavigationBar: BottomNavigationBar(
-                  currentIndex: selectedIndex,
-                  onTap: (index) => _onItemTapped(index, context),
-                  items: destinations,
-                  type: BottomNavigationBarType
-                      .fixed, // Ensures all items are visible
-                  selectedItemColor: const Color(0xFF18A0FB), // Active color
-                  unselectedItemColor: Colors.grey[600], // Inactive color
-                  selectedFontSize: 12,
-                  unselectedFontSize: 12,
-                  showUnselectedLabels: true,
+                bottomNavigationBar: Container(
+                  margin: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(30),
+                    child: BottomNavigationBar(
+                      currentIndex: selectedIndex,
+                      onTap: (index) => _onItemTapped(index, context),
+                      items: destinations,
+                      type: BottomNavigationBarType.fixed,
+                      backgroundColor:
+                          Colors.white, // Transparent to show container color
+                      selectedItemColor: const Color(0xFF18A0FB),
+                      unselectedItemColor: Colors.grey[400],
+                      selectedFontSize: 12,
+                      unselectedFontSize: 12,
+                      showUnselectedLabels: false, // Cleaner look
+                      showSelectedLabels: true,
+                      elevation: 0, // Handled by Container
+                    ),
+                  ),
                 ),
               );
             } else {
@@ -78,13 +100,21 @@ class ResponsiveScaffold extends StatelessWidget {
                   children: [
                     NavigationRail(
                       selectedIndex: selectedIndex,
+                      groupAlignment: -1.0, // Align items to top
+                      minExtendedWidth: 200, // Make rail wider
                       onDestinationSelected: (index) =>
                           _onItemTapped(index, context),
                       labelType: NavigationRailLabelType.selected,
                       destinations: destinations
                           .map((item) => NavigationRailDestination(
-                              icon: item.icon,
-                              selectedIcon: item.activeIcon,
+                              icon: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                  child: item.icon),
+                              selectedIcon: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                  child: item.activeIcon),
                               label: Text(item.label!)))
                           .toList(),
                       backgroundColor: Colors.white,

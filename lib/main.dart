@@ -160,20 +160,131 @@ class MyApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'DermaAI',
       theme: ThemeData(
+        useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-            seedColor: accent, brightness: Brightness.light),
-        useMaterial3: false,
+          seedColor: accent, // User preference or Default Medical Blue
+          brightness: Brightness.light,
+          primary: accent,
+          secondary: const Color(0xFF26A69A), // Teal accent for medical feel
+          surface: const Color(0xFFFFFFFF),
+          surfaceContainerLowest: const Color(0xFFF8F9FA), // Soft background
+        ),
         scaffoldBackgroundColor: const Color(0xFFF8F9FA),
-        textTheme: GoogleFonts.manropeTextTheme(),
+        textTheme:
+            GoogleFonts.manropeTextTheme(Theme.of(context).textTheme).apply(
+          bodyColor: const Color(0xFF212529),
+          displayColor: const Color(0xFF212529),
+        ),
+        appBarTheme: AppBarTheme(
+          backgroundColor: const Color(0xFFF8F9FA),
+          foregroundColor: Colors.black,
+          elevation: 0,
+          centerTitle: true,
+          titleTextStyle: GoogleFonts.manrope(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF212529),
+          ),
+        ),
+        cardTheme: CardThemeData(
+          color: Colors.white,
+          elevation: 2,
+          shadowColor: Colors.black.withOpacity(0.1),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: accent,
+            foregroundColor: Colors.white,
+            elevation: 3,
+            shadowColor: accent.withOpacity(0.4),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            textStyle:
+                GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: accent, width: 2),
+          ),
+        ),
         brightness: Brightness.light,
       ),
       darkTheme: ThemeData(
+        useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-            seedColor: accent, brightness: Brightness.dark),
-        useMaterial3: false,
-        scaffoldBackgroundColor: Colors.black,
+          seedColor: accent,
+          brightness: Brightness.dark,
+          surface: const Color(0xFF1E1E1E),
+        ),
+        scaffoldBackgroundColor: const Color(0xFF121212),
         textTheme: GoogleFonts.manropeTextTheme(
             ThemeData(brightness: Brightness.dark).textTheme),
+        appBarTheme: AppBarTheme(
+          backgroundColor: const Color(0xFF121212),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+          titleTextStyle: GoogleFonts.manrope(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        cardTheme: CardThemeData(
+          color: const Color(0xFF1E1E1E),
+          elevation: 2,
+          shadowColor: Colors.black.withOpacity(0.3),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: accent,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            textStyle:
+                GoogleFonts.manrope(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFF2C2C2C),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: Colors.grey.shade800),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: accent, width: 2),
+          ),
+        ),
         brightness: Brightness.dark,
       ),
       themeMode: appearance.darkMode ? ThemeMode.dark : ThemeMode.light,

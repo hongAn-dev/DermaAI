@@ -1,0 +1,1355 @@
+==================================================================================
+PHẦN 1: BACKEND (Python - server.py)
+==================================================================================
+
+from fastapi import FastAPI, File, UploadFile
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from PIL import Image
+import numpy as np
+import io
+import tensorflow as tf
+import base64
+import cv2
+
+app = FastAPI()
+
+# ==========================================
+# ⚙️ CẤU HÌNH CORS
+# ==========================================
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ==========================================
+# ⚙️ CẤU HÌNH MODEL
+# ==========================================
+MODEL_FILE = "skin_vgg16_model.keras"
+IMG_SIZE = (224, 224)
+INNER_MODEL_NAME = "vgg16"
+LAST_CONV_LAYER_NAME = "block5_conv3"
+
+CLASS_NAMES = [
+    'Actinic keratoses (akiec)',
+    'Basal cell carcinoma (bcc)',
+    'Benign keratosis-like lesions (bkl)',
+    'Dermatofibroma (df)',
+    'Melanoma (mel)',
+    'Melanocytic nevi (nv)',
+    'Vascular lesions (vasc)'
+]
+
+print(f"⏳ Đang tải model: {MODEL_FILE}...")
+try:
+    model = tf.keras.models.load_model(MODEL_FILE)
+    print("✅ Model tải thành công!")
+except Exception as e:
+    print(f"❌ LỖI Tải Model: {e}")
+    model = None
+
+# --- HÀM TÍNH GRAD-CAM (Dựa trên HEATMAP.py) ---
+def compute_gradcam(model, img_array, class_index, inner_layer_name="vgg16", conv_layer_name="block5_conv3"):
+    try:
+        # Lấy model con VGG16
+        inner_model = model.get_layer(inner_layer_name)
+        
+        # Tạo grad_model từ input của model con -> [conv_output, model_output]
+        grad_model = tf.keras.models.Model(
+            inputs=inner_model.input,
+            outputs=[inner_model.get_layer(conv_layer_name).output, inner_model.output]
+        )
+
+        with tf.GradientTape() as tape:
+            # Tính toán trên model con
+            conv_outputs, predictions = grad_model(img_array)
+            
+            # Logic Activation Map (An toàn nhất cho model lồng)
+            # Lấy trung bình các feature map
+            loss = predictions[:, class_index]
+
+        # Tính gradient của loss theo output của conv layer
+        grads = tape.gradient(loss, conv_outputs)
+
+        # Tính global average pooling của gradients
+        pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+
+        # Nhân feature map với weight (pooled gradients)
+        heatmap = conv_outputs[0] @ pooled_grads[..., tf.newaxis]
+        heatmap = tf.squeeze(heatmap)
+
+        # QUAY VỀ LOGIC ACTIVATION MAP
+        heatmap = tf.maximum(heatmap, 0)
+        
+        max_val = tf.math.reduce_max(heatmap)
+        if max_val == 0: return heatmap.numpy()
+        
+        heatmap = heatmap / max_val
+        return heatmap.numpy()
+
+    except Exception as e:
+        print(f"⚠️ Lỗi tính Heatmap: {e}")
+        return np.zeros((IMG_SIZE[0], IMG_SIZE[1]))
+
+def overlay_heatmap_cv2(img_pil, heatmap, alpha=0.4):
+    """
+    Hàm chồng ảnh dùng OpenCV (đã sửa lỗi màu sắc)
+    """
+    try:
+        # 1. Chuyển PIL (RGB) sang NumPy (RGB)
+        img = np.array(img_pil)
+        
+        # 2. Resize heatmap về kích thước ảnh gốc
+        heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[0]))
+        
+        # 3. Chuẩn hóa heatmap sang 0-255 (uint8)
+        heatmap = np.uint8(255 * heatmap)
+        
+        # 4. Tạo bản đồ màu (ColorMap)
+        # Lưu ý: applyColorMap trả về BGR theo chuẩn OpenCV
+        heatmap_colored = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+        
+        # 5. Chuyển Heatmap từ BGR sang RGB để khớp với ảnh gốc (PIL)
+        heatmap_colored = cv2.cvtColor(heatmap_colored, cv2.COLOR_BGR2RGB)
+        
+        # 6. Pha trộn (Blend)
+        # img là RGB, heatmap_colored cũng là RGB -> Kết quả đúng màu
+        superimposed_img = cv2.addWeighted(img, alpha, heatmap_colored, 1 - alpha, 0)
+        
+        # 7. Trả về PIL Image
+        return Image.fromarray(superimposed_img)
+        
+    except Exception as e:
+        print(f"Lỗi overlay: {e}")
+        return img_pil # Trả về ảnh gốc nếu lỗi
+
+def pil_image_to_base64(image):
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+@app.get("/")
+def home():
+    return {"status": "Skin-AI Server Running (Fixed Color Logic)"}
+
+@app.post("/explain")
+async def explain_image(file: UploadFile = File(...)):
+    if model is None:
+        return JSONResponse(content={"error": "Model chưa tải"}, status_code=500)
+
+    try:
+        # 1. Đọc và Tiền xử lý (Code xử lý ảnh đầu vào)
+        image_data = await file.read()
+        image_pil = Image.open(io.BytesIO(image_data)).convert("RGB")
+        img_tensor = image_pil.resize(IMG_SIZE)
+        img_array = np.array(img_tensor)
+        img_array = np.expand_dims(img_array, axis=0) / 255.0
+
+        print(f"🔍 Phân tích ảnh shape: {img_array.shape}")
+
+        # 2. Dự đoán (Code Predict)
+        predictions = model.predict(img_array)
+        scores = predictions[0]
+        predicted_index = np.argmax(scores)
+        predicted_class = CLASS_NAMES[predicted_index]
+        confidence = float(scores[predicted_index])
+
+        # Chi tiết
+        detailed_results = []
+        for i, score in enumerate(scores):
+            detailed_results.append({
+                "disease": CLASS_NAMES[i],
+                "probability": float(score) * 100,
+                "score": float(score)
+            })
+        detailed_results.sort(key=lambda x: x["probability"], reverse=True)
+
+        # 3. Tạo Heatmap
+        heatmap = compute_gradcam(
+            model,
+            img_array,
+            predicted_index,
+            inner_layer_name=INNER_MODEL_NAME,
+            conv_layer_name=LAST_CONV_LAYER_NAME
+        )
+        
+        # Overlay: Dùng ảnh gốc đã resize để hiển thị đẹp
+        display_img = image_pil.resize(IMG_SIZE)
+        result_img = overlay_heatmap_cv2(display_img, heatmap, alpha=0.4)
+
+        # Base64
+        heatmap_base64_str = pil_image_to_base64(result_img)
+
+        # 4. Trả về JSON (Code hiển thị kết quả)
+        return JSONResponse(content={
+            "status": "success",
+            "prediction": {
+                "class": predicted_class,
+                "confidence": f"{confidence * 100:.2f}%",
+                "confidence_score": confidence
+            },
+            "details": detailed_results,
+            "heatmap_image": heatmap_base64_str
+        })
+
+    except Exception as e:
+        print(f"❌ Lỗi Xử lý Server: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+==================================================================================
+PHẦN 2: FRONTEND (Flutter/Dart)
+==================================================================================
+
+FILE: lib/services/api_service.dart
+----------------------------------------------------------------------------------
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+// Import the centralized data models instead of defining them here
+import 'package:myapp/models/analysis_model.dart';
+
+import 'package:flutter/foundation.dart';
+
+// --- API Service Class ---
+
+class ApiService {
+  // NOTE: This assumes the backend is running locally on port 8000.
+  // Use 10.0.2.2 for Android emulator to access host localhost.
+  static String get _baseUrl {
+    if (kIsWeb) return 'http://localhost:8000';
+    try {
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        return 'http://10.0.2.2:8000';
+      }
+    } catch (_) {
+      // defaultTargetPlatform might throw/not work in some edge/test environments, fallback to localhost
+    }
+    return 'http://localhost:8000';
+  }
+
+  /// Analyzes an image by sending it to the backend server.
+  ///
+  /// The [imageFile] is sent as a multipart request to the /explain endpoint.
+  /// It returns an [AnalysisResponse] object if successful, otherwise null.
+  Future<AnalysisResponse?> analyzeImage(XFile imageFile) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      // Throwing an exception is better for handling this case in the UI.
+      throw Exception("User is not authenticated. Cannot analyze image.");
+    }
+    final userId = user.uid;
+
+    final uri = Uri.parse('$_baseUrl/explain');
+    final request = http.MultipartRequest('POST', uri);
+
+    final imageBytes = await imageFile.readAsBytes();
+
+    // Create a unique filename for the image to avoid potential conflicts.
+    final imageName =
+        '${DateTime.now().millisecondsSinceEpoch}_${imageFile.name}';
+
+    final multipartFile = http.MultipartFile.fromBytes(
+      'file',
+      imageBytes,
+      filename: imageName,
+    );
+
+    request.files.add(multipartFile);
+    // You can add more fields to the request if your backend needs them, e.g.:
+    // request.fields['userId'] = userId;
+
+    try {
+      final response = await request.send();
+
+      if (response.statusCode == 200) {
+        final responseBody = await response.stream.bytesToString();
+        final decodedJson = jsonDecode(responseBody);
+        // Now uses the model from analysis_model.dart
+        return AnalysisResponse.fromJson(decodedJson);
+      } else {
+        final errorBody = await response.stream.bytesToString();
+        // Providing more specific error information is helpful for debugging.
+        throw Exception('Server Error ${response.statusCode}: $errorBody');
+      }
+    } catch (e) {
+      // Log the error and re-throw to allow the UI to handle it.
+      print('Error in analyzeImage: $e');
+      rethrow;
+    }
+  }
+}
+
+
+FILE: lib/models/analysis_model.dart
+----------------------------------------------------------------------------------
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+// ==========================================
+// PART 1: Models for handling API Response
+// ==========================================
+
+class AnalysisResponse {
+  final Prediction prediction;
+  final List<DiseaseDetail> details;
+  final String heatmapImage;
+
+  AnalysisResponse({
+    required this.prediction,
+    required this.details,
+    required this.heatmapImage,
+  });
+
+  factory AnalysisResponse.fromJson(Map<String, dynamic> json) {
+    var detailsList = json['details'] as List;
+    List<DiseaseDetail> details =
+        detailsList.map((i) => DiseaseDetail.fromJson(i)).toList();
+
+    return AnalysisResponse(
+      prediction: Prediction.fromJson(json['prediction']),
+      details: details,
+      heatmapImage: json['heatmap_image'] as String,
+    );
+  }
+}
+
+class Prediction {
+  final String className;
+  final String confidence;
+
+  Prediction({required this.className, required this.confidence});
+
+  factory Prediction.fromJson(Map<String, dynamic> json) {
+    return Prediction(
+      // Key trả về từ API, thường là 'class' hoặc 'class_name'
+      className: json['class'] as String,
+      confidence: json['confidence'] as String,
+    );
+  }
+}
+
+class DiseaseDetail {
+  final String disease;
+  final double probability;
+
+  DiseaseDetail({required this.disease, required this.probability});
+
+  factory DiseaseDetail.fromJson(Map<String, dynamic> json) {
+    return DiseaseDetail(
+      disease: json['disease'] as String,
+      probability: (json['probability'] as num).toDouble(),
+    );
+  }
+
+  // Helper để convert sang JSON khi lưu xuống Firestore
+  Map<String, dynamic> toJson() {
+    return {
+      'disease': disease,
+      'probability': probability,
+    };
+  }
+}
+
+// ==========================================
+// PART 2: Model for storing data in Firestore
+// ==========================================
+
+class AnalysisResult {
+  final String id;
+  final String userId;
+  final String disease;
+  final double probability;
+  final String recommendation;
+  final String imageUrl;
+  final DateTime timestamp;
+  final List<DiseaseDetail> details; // Sử dụng List object thay vì List Map
+
+  AnalysisResult({
+    required this.id,
+    required this.userId,
+    required this.disease,
+    required this.probability,
+    required this.recommendation,
+    required this.imageUrl,
+    required this.timestamp,
+    required this.details,
+  });
+
+  // Chuyển từ JSON Firestore về Object
+  factory AnalysisResult.fromJson(Map<String, dynamic> json) {
+    return AnalysisResult(
+      id: json['id'] as String? ?? '',
+      userId: json['userId'] as String? ?? '',
+      disease: json['disease'] as String? ?? 'Unknown',
+      probability: (json['probability'] as num?)?.toDouble() ?? 0.0,
+      recommendation: json['recommendation'] as String? ?? '',
+      imageUrl: json['imageUrl'] as String? ?? '',
+      timestamp: (json['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+
+      // Convert từ List<dynamic> trong Firestore sang List<DiseaseDetail>
+      details: json['details'] != null
+          ? (json['details'] as List)
+              .map((i) => DiseaseDetail.fromJson(i as Map<String, dynamic>))
+              .toList()
+          : [],
+    );
+  }
+
+  // Chuyển từ Object sang JSON để lưu lên Firestore
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'userId': userId,
+      'disease': disease,
+      'probability': probability,
+      'recommendation': recommendation,
+      'imageUrl': imageUrl,
+      'timestamp': Timestamp.fromDate(timestamp),
+
+      // Tự động convert từng object DiseaseDetail sang JSON
+      'details': details.map((e) => e.toJson()).toList(),
+    };
+  }
+}
+
+
+FILE: lib/screens/scan/scan_screen.dart
+----------------------------------------------------------------------------------
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import 'package:image_picker/image_picker.dart';
+import 'package:go_router/go_router.dart';
+import 'package:myapp/models/analysis_model.dart';
+import 'package:myapp/services/api_service.dart';
+import 'package:myapp/screens/scan/analysis_results_screen.dart';
+import 'package:myapp/utils/responsive.dart';
+
+class ScanScreen extends StatefulWidget {
+  const ScanScreen({super.key});
+
+  @override
+  State<ScanScreen> createState() => _ScanScreenState();
+}
+
+class _ScanScreenState extends State<ScanScreen> with TickerProviderStateMixin {
+  final ImagePicker _picker = ImagePicker();
+  final ApiService _apiService = ApiService();
+  XFile? _image;
+  Uint8List? _imageBytes;
+  bool _isAnalyzing = false;
+  late AnimationController _controller;
+  late AnimationController _scanningController;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _scanningController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scanningController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(source: source);
+      if (!mounted || image == null) return;
+
+      final bytes = await image.readAsBytes();
+
+      setState(() {
+        _image = image;
+        _imageBytes = bytes;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lấy ảnh thất bại: $e')),
+      );
+    }
+  }
+
+  Future<void> _analyzeImage() async {
+    if (_image == null || _imageBytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng chọn ảnh trước!')),
+      );
+      return;
+    }
+
+    final Uint8List bytesForAnalysis = _imageBytes!;
+
+    setState(() {
+      _isAnalyzing = true;
+    });
+
+    try {
+      final AnalysisResponse? result = await _apiService.analyzeImage(_image!);
+      if (!mounted) return;
+
+      if (result != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AnalysisResultsScreen(
+              analysisResult: result,
+              imageBytes: bytesForAnalysis,
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Phân tích thất bại. Không có kết quả trả về.')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi khi phân tích ảnh: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+          // _image = null; // Optional: Keep image to allow re-try
+          // _imageBytes = null;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back,
+              color: Theme.of(context).colorScheme.onSurface),
+          onPressed: () => context.go('/home'),
+        ),
+        title: Text(
+          'Phân tích da AI',
+          style: GoogleFonts.manrope(
+              fontWeight: FontWeight.bold,
+              fontSize: Responsive.fontSize(context, 18),
+              color: Theme.of(context).colorScheme.onSurface),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWeb = constraints.maxWidth > 800;
+          final content = _imageBytes == null
+              ? _buildScannerInterface()
+              : _buildAnalysisInterface();
+
+          if (isWeb) {
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: Center(child: content),
+                    ),
+                    Container(
+                      width: 1,
+                      height: double.infinity,
+                      margin: const EdgeInsets.symmetric(vertical: 40),
+                      color: Colors.grey.withOpacity(0.2),
+                    ),
+                    Expanded(
+                      flex: 4,
+                      child: Padding(
+                        padding: EdgeInsets.all(Responsive.scale(context, 32)),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Hướng dẫn chụp',
+                              style: GoogleFonts.manrope(
+                                fontSize: Responsive.fontSize(context, 24),
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            _buildInstructionStep(context, '1',
+                                'Đảm bảo đủ ánh sáng', Icons.light_mode),
+                            const SizedBox(height: 16),
+                            _buildInstructionStep(context, '2',
+                                'Giữ camera ổn định', Icons.camera),
+                            const SizedBox(height: 16),
+                            _buildInstructionStep(
+                                context,
+                                '3',
+                                'Vùng da nằm gọn trong khung',
+                                Icons.center_focus_weak),
+                            const SizedBox(height: 40),
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.privacy_tip_outlined,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Text(
+                                      'Ảnh của bạn được mã hóa và chỉ sử dụng cho mục đích phân tích.',
+                                      style: GoogleFonts.manrope(
+                                        fontSize: 14,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          } else {
+            return Center(child: content);
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildInstructionStep(
+      BuildContext context, String step, String text, IconData icon) {
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            step,
+            style: GoogleFonts.manrope(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Icon(icon, color: Colors.grey[600], size: 20),
+        const SizedBox(width: 12),
+        Text(
+          text,
+          style: GoogleFonts.manrope(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[800],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScannerInterface() {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(Responsive.scale(context, 24)),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'Bắt đầu kiểm tra',
+            style: GoogleFonts.manrope(
+              fontSize: Responsive.fontSize(context, 24),
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          SizedBox(height: Responsive.scale(context, 8)),
+          Text(
+            'Đặt vùng da cần kiểm tra vào khung hình bên dưới',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.manrope(
+              fontSize: Responsive.fontSize(context, 14),
+              color: Colors.grey,
+            ),
+          ),
+          SizedBox(height: Responsive.scale(context, 40)),
+
+          // --- Pulsing Scan Zone ---
+          GestureDetector(
+            onTap: () => _pickImage(ImageSource.camera),
+            child: SizedBox(
+              width: Responsive.scale(context, 300),
+              height: Responsive.scale(context, 300),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Base pulsing circle
+                  AnimatedBuilder(
+                    animation: _controller,
+                    builder: (context, child) {
+                      return Container(
+                        width: Responsive.scale(context, 250),
+                        height: Responsive.scale(context, 250),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withOpacity(0.05),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: primaryColor
+                                .withOpacity(0.5 + (_controller.value * 0.5)),
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: primaryColor
+                                  .withOpacity(0.2 * _controller.value),
+                              blurRadius: 20 + (10 * _controller.value),
+                              spreadRadius: 5 * _controller.value,
+                            )
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  // Scanning Line
+                  AnimatedBuilder(
+                    animation: _scanningController,
+                    builder: (context, child) {
+                      return Positioned(
+                        top: _scanningController.value *
+                            Responsive.scale(context, 250),
+                        child: Container(
+                          width: Responsive.scale(context, 220),
+                          height: 2,
+                          decoration: BoxDecoration(
+                            boxShadow: [
+                              BoxShadow(
+                                color: primaryColor.withOpacity(0.8),
+                                blurRadius: 10,
+                                spreadRadius: 2,
+                              )
+                            ],
+                            color: primaryColor,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  // Camera Icon and Text
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.center_focus_strong,
+                          size: Responsive.scale(context, 60),
+                          color: primaryColor),
+                      SizedBox(height: Responsive.scale(context, 12)),
+                      Text('CHẠM ĐỂ CHỤP',
+                          style: GoogleFonts.manrope(
+                              fontWeight: FontWeight.bold,
+                              color: primaryColor,
+                              letterSpacing: 1.2)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          SizedBox(height: Responsive.scale(context, 40)),
+
+          // --- Alternative Button ---
+          TextButton.icon(
+            onPressed: () => _pickImage(ImageSource.gallery),
+            icon: const Icon(Icons.photo_library),
+            label: const Text('Hoặc chọn từ thư viện'),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.onSurface,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalysisInterface() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(Responsive.scale(context, 24)),
+      child: Column(
+        children: [
+          Container(
+            height: Responsive.scale(context, 300),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              image: DecorationImage(
+                image: MemoryImage(_imageBytes!),
+                fit: BoxFit.cover,
+              ),
+              boxShadow: const [
+                BoxShadow(color: Colors.black26, blurRadius: 10)
+              ],
+            ),
+          ),
+          SizedBox(height: Responsive.scale(context, 32)),
+          if (_isAnalyzing)
+            Column(
+              children: [
+                CircularProgressIndicator(
+                  strokeWidth: 4,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                      Theme.of(context).colorScheme.primary),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Đang phân tích tế bào da...',
+                  style: GoogleFonts.manrope(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  'Quá trình này mất khoảng vài giây',
+                  style: GoogleFonts.manrope(color: Colors.grey),
+                ),
+              ],
+            )
+          else
+            Column(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _analyzeImage,
+                    icon: const Icon(Icons.analytics_outlined),
+                    label: const Text('BẮT ĐẦU PHÂN TÍCH'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      // Theme data handles the rest
+                    ),
+                  ),
+                ),
+                SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _image = null;
+                      _imageBytes = null;
+                    });
+                  },
+                  child: const Text('Chọn ảnh khác'),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+
+FILE: lib/screens/scan/analysis_results_screen.dart
+----------------------------------------------------------------------------------
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:myapp/models/analysis_model.dart';
+import 'package:myapp/services/firestore_service.dart';
+import 'package:percent_indicator/circular_percent_indicator.dart';
+import 'package:percent_indicator/linear_percent_indicator.dart';
+import 'package:uuid/uuid.dart';
+import 'dart:developer' as developer;
+import 'package:myapp/utils/responsive.dart';
+
+class AnalysisResultsScreen extends StatefulWidget {
+  final AnalysisResponse analysisResult;
+  final Uint8List imageBytes;
+
+  const AnalysisResultsScreen({
+    super.key,
+    required this.analysisResult,
+    required this.imageBytes,
+  });
+
+  @override
+  State<AnalysisResultsScreen> createState() => _AnalysisResultsScreenState();
+}
+
+class _AnalysisResultsScreenState extends State<AnalysisResultsScreen>
+    with SingleTickerProviderStateMixin {
+  final FirestoreService _firestoreService = FirestoreService();
+  final Uuid _uuid = const Uuid();
+  late Uint8List _heatmapBytes;
+  bool _isSaved = false;
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    widget.analysisResult.details
+        .sort((a, b) => b.probability.compareTo(a.probability));
+    _heatmapBytes = base64Decode(widget.analysisResult.heatmapImage);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _saveAnalysis();
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveAnalysis() async {
+    const String logName = 'firestore.save';
+    if (!mounted) return;
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final analysisId = _uuid.v4();
+      final topPrediction = widget.analysisResult.prediction;
+
+      final Map<String, dynamic> dataToSave = {
+        'imagePath':
+            "", // Placeholder for explicit image URL if uploaded to Storage
+        'scanResult': {
+          'prediction': {
+            'className': topPrediction.className,
+            'confidence': topPrediction.confidence,
+            'confidenceScore':
+                widget.analysisResult.details.first.probability / 100,
+          },
+          'status': 'success',
+          'timestamp': Timestamp.now(),
+          'userId': user.uid,
+          'details':
+              widget.analysisResult.details.map((e) => e.toJson()).toList(),
+        },
+      };
+
+      await _firestoreService.saveRawAnalysisResult(analysisId, dataToSave);
+
+      if (mounted) {
+        setState(() {
+          _isSaved = true;
+        });
+      }
+    } catch (e) {
+      developer.log('Failed to save analysis', error: e, name: logName);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        leading: IconButton(
+          icon:
+              Icon(Icons.close, color: Theme.of(context).colorScheme.onSurface),
+          onPressed: () => context.go('/home'),
+        ),
+        title: Text(
+          'Kết quả phân tích',
+          style: GoogleFonts.manrope(
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWeb = constraints.maxWidth > 800;
+
+          if (isWeb) {
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: Padding(
+                  padding: EdgeInsets.all(Responsive.scale(context, 20.0)),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Left Column: Image Viewer
+                      Expanded(
+                        flex: 5,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              _buildImageViewer(context),
+                              SizedBox(height: Responsive.scale(context, 24)),
+                              // On Web, maybe show some extra meta-data or tips here if needed
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: Responsive.scale(context, 32)),
+                      // Right Column: Results & Actions
+                      Expanded(
+                        flex: 4,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              _buildScoreCard(context),
+                              SizedBox(height: Responsive.scale(context, 24)),
+                              _buildDetailsCard(context),
+                              SizedBox(height: Responsive.scale(context, 24)),
+                              _buildActionButtons(context),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          } else {
+            return SingleChildScrollView(
+              padding: EdgeInsets.all(Responsive.scale(context, 20.0)),
+              child: Column(
+                children: [
+                  _buildScoreCard(context),
+                  SizedBox(height: Responsive.scale(context, 24)),
+                  _buildImageViewer(context),
+                  SizedBox(height: Responsive.scale(context, 24)),
+                  _buildDetailsCard(context),
+                  SizedBox(height: Responsive.scale(context, 24)),
+                  _buildActionButtons(context),
+                ],
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildScoreCard(BuildContext context) {
+    final topDetail = widget.analysisResult.details.first;
+    final confidencePercent = topDetail.probability / 100;
+
+    // Determine color based on severity (heuristic: malignant/carcinoma = red)
+    final isDanger = topDetail.disease.toLowerCase().contains('malignant') ||
+        topDetail.disease.toLowerCase().contains('carcinoma') ||
+        topDetail.disease.toLowerCase().contains('melanoma');
+    final color = isDanger ? Colors.redAccent : Colors.green;
+
+    return Container(
+      padding: EdgeInsets.all(Responsive.scale(context, 24)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.1),
+            blurRadius: 20,
+            spreadRadius: 5,
+          )
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Kết quả chẩn đoán',
+                      style: GoogleFonts.manrope(
+                        color: Colors.grey,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      topDetail.disease,
+                      style: GoogleFonts.manrope(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        isDanger ? 'Cần chú ý cao' : 'Rủi ro thấp',
+                        style: GoogleFonts.manrope(
+                          color: color,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              CircularPercentIndicator(
+                radius: 50.0,
+                lineWidth: 10.0,
+                percent: confidencePercent,
+                center: Text(
+                  "${(confidencePercent * 100).toStringAsFixed(1)}%",
+                  style: GoogleFonts.manrope(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18.0,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                progressColor: color,
+                backgroundColor: color.withOpacity(0.1),
+                circularStrokeCap: CircularStrokeCap.round,
+                animation: true,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageViewer(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: TabBar(
+            controller: _tabController,
+            indicator: BoxDecoration(
+              borderRadius: BorderRadius.circular(20), // Creates border
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.black54,
+            labelStyle: GoogleFonts.manrope(fontWeight: FontWeight.bold),
+            tabs: const [
+              Tab(text: "Ảnh gốc"),
+              Tab(text: "Heatmap AI"),
+            ],
+          ),
+        ),
+        SizedBox(height: 16),
+        SizedBox(
+          height: 300,
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildImageContainer(widget.imageBytes),
+              _buildImageContainer(_heatmapBytes),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImageContainer(Uint8List bytes) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        image: DecorationImage(
+          image: MemoryImage(bytes),
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailsCard(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(Responsive.scale(context, 20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: Theme.of(context).cardTheme.shadowColor != null
+            ? [
+                BoxShadow(
+                    color: Theme.of(context).cardTheme.shadowColor!,
+                    blurRadius: 10)
+              ]
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Phân tích chi tiết',
+            style: GoogleFonts.manrope(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          SizedBox(height: 20),
+          ...widget.analysisResult.details.take(3).map((detail) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(detail.disease,
+                          style:
+                              GoogleFonts.manrope(fontWeight: FontWeight.w600)),
+                      Text('${detail.probability.toStringAsFixed(1)}%',
+                          style: GoogleFonts.manrope(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[600])),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  LinearPercentIndicator(
+                    lineHeight: 8.0,
+                    percent: detail.probability / 100,
+                    backgroundColor: Colors.grey[100],
+                    progressColor: Theme.of(context).colorScheme.primary,
+                    barRadius: const Radius.circular(4),
+                    padding: EdgeInsets.zero,
+                    animation: true,
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(BuildContext context) {
+    return Column(
+      children: [
+        if (_isSaved)
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.green.withOpacity(0.3)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_circle, size: 20, color: Colors.green),
+                SizedBox(width: 8),
+                Text(
+                  'Đã lưu vào lịch sử',
+                  style: GoogleFonts.manrope(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ElevatedButton(
+          onPressed: () => context.go('/history'),
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 56),
+            backgroundColor: const Color(0xFF18A0FB),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+          child: Text(
+            'Xem Lịch Sử',
+            style: GoogleFonts.manrope(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        SizedBox(height: 16),
+        TextButton(
+          onPressed: () => context.go('/scan'),
+          child: Text(
+            'Quét ảnh khác',
+            style: GoogleFonts.manrope(
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+

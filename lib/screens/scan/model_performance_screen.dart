@@ -18,7 +18,7 @@ class ModelPerformanceScreen extends StatelessWidget {
             onPressed: () => Navigator.of(context).pop(),
           ),
           title: Text(
-            'Model Performance',
+            'Hiệu suất mô hình',
             style: GoogleFonts.manrope(
                 fontWeight: FontWeight.bold,
                 color: Colors.black,
@@ -37,15 +37,15 @@ class ModelPerformanceScreen extends StatelessWidget {
               SizedBox(height: Responsive.scale(context, 24)),
               _buildInfoCard(
                 context,
-                title: 'Confusion Matrix',
-                subtitle:
-                    'Performance of the classification model on the test dataset.',
+                title: 'Ma trận nhầm lẫn',
+                  subtitle:
+                      'Hiệu suất của mô hình phân loại trên tập dữ liệu kiểm thử.',
                 // Placeholder image for the confusion matrix
                 child: Image.network(
                     'https://firebasestorage.googleapis.com/v0/b/project-id-dev-b2d9b.appspot.com/o/confusion_matrix.png?alt=media&token=8d23d8f1-8f2c-4b7e-8b9a-4e2b0d71f6d3'),
               ),
               SizedBox(height: Responsive.scale(context, 24)),
-              Text('Training Progress',
+                Text('Tiến trình huấn luyện',
                   style: GoogleFonts.manrope(
                       fontWeight: FontWeight.bold,
                       fontSize: Responsive.fontSize(context, 18))),
@@ -55,15 +55,15 @@ class ModelPerformanceScreen extends StatelessWidget {
                 unselectedLabelColor: Colors.grey[600],
                 indicatorColor: const Color(0xFF18A0FB),
                 tabs: const [
-                  Tab(text: 'Training'),
-                  Tab(text: 'Validation'),
+                  Tab(text: 'Huấn luyện'),
+                  Tab(text: 'Xác thực'),
                 ],
               ),
               SizedBox(height: Responsive.scale(context, 16)),
               _buildInfoCard(
                 context,
-                title: 'Accuracy Over Epochs',
-                subtitle: 'Model accuracy improvement during training.',
+                title: 'Độ chính xác theo epoch',
+                subtitle: 'Sự cải thiện độ chính xác của mô hình trong quá trình huấn luyện.',
                 // Placeholder image for the accuracy graph
                 child: Image.network(
                     'https://firebasestorage.googleapis.com/v0/b/project-id-dev-b2d9b.appspot.com/o/accuracy_graph.png?alt=media&token=2d4778d4-2092-4217-8e6c-38f375f0a6d1'),
@@ -71,8 +71,8 @@ class ModelPerformanceScreen extends StatelessWidget {
               SizedBox(height: Responsive.scale(context, 16)),
               _buildInfoCard(
                 context,
-                title: 'Loss Over Epochs',
-                subtitle: 'Model loss reduction during training.',
+                title: 'Mất mát theo epoch',
+                subtitle: 'Sự giảm hàm mất mát trong quá trình huấn luyện.',
                 // Placeholder image for the loss graph
                 child: Image.network(
                     'https://firebasestorage.googleapis.com/v0/b/project-id-dev-b2d9b.appspot.com/o/loss_graph.png?alt=media&token=92e31573-fe84-4a4b-9d41-32a26569f195'),
@@ -88,9 +88,9 @@ class ModelPerformanceScreen extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        _buildMetricCard(context, 'Overall Accuracy', '95.2%'),
-        _buildMetricCard(context, 'Precision', '94.8%'),
-        _buildMetricCard(context, 'Recall', '96.1%'),
+        _buildMetricCard(context, 'Độ chính xác tổng thể', '95.2%'),
+        _buildMetricCard(context, 'Độ chính xác', '94.8%'),
+        _buildMetricCard(context, 'Độ thu hồi', '96.1%'),
       ],
     );
   }
