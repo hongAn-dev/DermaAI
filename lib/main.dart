@@ -29,7 +29,6 @@ import 'package:myapp/screens/scan/model_performance_screen.dart';
 import 'package:myapp/screens/profile/profile_screen.dart';
 import 'package:myapp/screens/authen/register_screen.dart';
 import 'package:myapp/screens/profile/personal_information_screen.dart';
-import 'package:myapp/screens/profile/appearance_screen.dart';
 import 'package:myapp/screens/profile/subscription_management_screen.dart';
 import 'package:myapp/screens/profile/change_password_screen.dart';
 import 'package:myapp/screens/profile/terms_of_service_screen.dart';
@@ -124,9 +123,6 @@ class MyApp extends StatelessWidget {
           GoRoute(
               path: 'personal_information',
               builder: (context, state) => const PersonalInformationScreen()),
-          GoRoute(
-              path: 'appearance',
-              builder: (context, state) => const AppearanceScreen()),
           GoRoute(
               path: 'subscription',
               builder: (context, state) =>

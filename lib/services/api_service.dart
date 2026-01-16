@@ -11,18 +11,8 @@ import 'package:flutter/foundation.dart';
 // --- API Service Class ---
 
 class ApiService {
-  // NOTE: This assumes the backend is running locally on port 8000.
-  // Use 10.0.2.2 for Android emulator to access host localhost.
   static String get _baseUrl {
-    if (kIsWeb) return 'http://localhost:8000';
-    try {
-      if (defaultTargetPlatform == TargetPlatform.android) {
-        return 'http://10.0.2.2:8000';
-      }
-    } catch (_) {
-      // defaultTargetPlatform might throw/not work in some edge/test environments, fallback to localhost
-    }
-    return 'http://localhost:8000';
+    return 'https://hanml-dermaai.hf.space';
   }
 
   /// Analyzes an image by sending it to the backend server.

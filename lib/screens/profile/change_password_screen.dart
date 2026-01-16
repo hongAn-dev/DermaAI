@@ -90,7 +90,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Change Password',
+          'Thay đổi mật khẩu',
           style: GoogleFonts.manrope(
               fontWeight: FontWeight.bold, color: Colors.black, fontSize: 18),
         ),

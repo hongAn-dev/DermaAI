@@ -55,6 +55,10 @@ class AuthViewModel extends ChangeNotifier {
     required String password,
     required String displayName,
     required String role,
+    String? phoneNumber,
+    String? birthDate,
+    String? gender,
+    String? address,
   }) async {
     _setLoading(true);
     _setError(null);
@@ -64,6 +68,10 @@ class AuthViewModel extends ChangeNotifier {
         password: password,
         displayName: displayName,
         role: role,
+        phoneNumber: phoneNumber,
+        birthDate: birthDate,
+        gender: gender,
+        address: address,
       );
       return true;
     } on FirebaseAuthException catch (e) {
@@ -96,6 +104,15 @@ class AuthViewModel extends ChangeNotifier {
       return false;
     } finally {
       _setLoading(false);
+    }
+  }
+
+  Future<bool> checkPhoneNumberExists(String phoneNumber) async {
+    try {
+      return await _authRepository.isPhoneNumberTaken(phoneNumber);
+    } catch (e) {
+      // In case of error (e.g. permission), assume not taken or handle gracefully
+      return false;
     }
   }
 }

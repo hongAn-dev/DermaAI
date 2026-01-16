@@ -36,6 +36,15 @@ class _ConsultPageState extends State<ConsultPage> {
   final TextEditingController _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // Refresh data when screen loads to handle re-login scenarios
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ConsultViewModel>().refreshDoctors();
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -87,7 +96,10 @@ class _ConsultPageState extends State<ConsultPage> {
                             fontWeight: FontWeight.bold,
                             fontSize: Responsive.fontSize(context, 20))),
                     TextButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          _showAllDoctors(context,
+                              context.read<ConsultViewModel>().doctors);
+                        },
                         child: Text('Xem tất cả',
                             style: GoogleFonts.manrope(
                                 color: const Color(0xFF18A0FB)))),
@@ -111,8 +123,11 @@ class _ConsultPageState extends State<ConsultPage> {
                           child: Text('Không tìm thấy bác sĩ nào'));
                     }
 
+                    // Limit to 3 items
+                    final displayedDoctors = viewModel.doctors.take(3).toList();
+
                     return Column(
-                      children: viewModel.doctors.map((doctor) {
+                      children: displayedDoctors.map((doctor) {
                         return _buildDoctorCard(context, doctor);
                       }).toList(),
                     );
@@ -400,6 +415,81 @@ class _ConsultPageState extends State<ConsultPage> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showAllDoctors(BuildContext context, List<Doctor> doctors) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Container(
+              height: MediaQuery.of(context).size.height * 0.85,
+              decoration: const BoxDecoration(
+                color: Color(0xFFF8F9FA),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  // Header of BottomSheet
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(24)),
+                      border:
+                          Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(
+                            'Tất cả bác sĩ',
+                            style: GoogleFonts.manrope(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: doctors.length,
+                            itemBuilder: (context, index) {
+                              return _buildDoctorCard(context, doctors[index]);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

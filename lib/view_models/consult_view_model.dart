@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 import '../data/models/doctor_model.dart';
 import '../data/repositories/doctor_repository.dart';
 
@@ -9,6 +10,7 @@ class ConsultViewModel extends ChangeNotifier {
   List<Doctor> _filteredDoctors = [];
   bool _isLoading = true;
   String? _errorMessage;
+  StreamSubscription? _subscription;
 
   ConsultViewModel({required DoctorRepository doctorRepository})
       : _doctorRepository = doctorRepository {
@@ -22,10 +24,16 @@ class ConsultViewModel extends ChangeNotifier {
   String get searchQuery => _searchQuery;
 
   void _initDoctorsListener() {
-    _doctorRepository.getDoctorsStream().listen(
+    _isLoading = true;
+    _errorMessage = null; // Reset error
+    notifyListeners();
+
+    _subscription?.cancel();
+    _subscription = _doctorRepository.getDoctorsStream().listen(
       (doctors) {
         _allDoctors = doctors;
         _isLoading = false;
+        _errorMessage = null; // Clear error on success
         _filterDoctors(); // Apply current filter
         notifyListeners();
       },
@@ -35,6 +43,10 @@ class ConsultViewModel extends ChangeNotifier {
         notifyListeners();
       },
     );
+  }
+
+  void refreshDoctors() {
+    _initDoctorsListener();
   }
 
   void search(String query) {
@@ -53,5 +65,11 @@ class ConsultViewModel extends ChangeNotifier {
             doctor.specialization.toLowerCase().contains(query);
       }).toList();
     }
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 }

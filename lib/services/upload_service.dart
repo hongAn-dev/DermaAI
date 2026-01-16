@@ -4,15 +4,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart';
 
 class UploadService {
-  // Manual Base URL logic to ensure consistency with ApiService
+  // Ensure consistency with ApiService
   String get _baseUrl {
-    if (kIsWeb) return 'http://localhost:8000';
-    try {
-      if (defaultTargetPlatform == TargetPlatform.android) {
-        return 'http://10.0.2.2:8000';
-      }
-    } catch (_) {}
-    return 'http://localhost:8000';
+    return 'https://hanml-dermaai.hf.space';
   }
 
   Future<String?> uploadFile(Uint8List fileBytes, String filename) async {

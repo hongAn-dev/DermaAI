@@ -9,8 +9,8 @@ class ChatRepository {
   final UploadService _uploadService = UploadService();
 
   // Stream of messages for a specific chat room
-  Stream<DatabaseEvent> getMessages(String chatId) {
-    return _realtimeService.messagesStream(chatId);
+  Stream<DatabaseEvent> getMessages(String chatId, {int? startAt}) {
+    return _realtimeService.messagesStream(chatId, startAt: startAt);
   }
 
   // Send a message

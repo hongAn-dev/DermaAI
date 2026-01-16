@@ -15,7 +15,7 @@ class SubscriptionManagementScreen extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Subscription Management',
+          'Quản lý gói bảo hiểm',
           style: GoogleFonts.manrope(
               fontWeight: FontWeight.bold, color: Colors.black, fontSize: 18),
         ),

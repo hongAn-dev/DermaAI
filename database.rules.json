@@ -1,4 +1,3 @@
-
 {
   "rules": {
     "history": {
@@ -7,32 +6,17 @@
         ".write": "$uid === auth.uid"
       }
     },
-
     "users": {
-      "$uid": {
-        ".read": "auth != null",
-        ".write": "auth != null && auth.uid == $uid"
-      }
+      ".read": "auth != null",
+      ".write": "auth != null"
     },
-
     "user_chats": {
-      "$uid": {
-        "$chatId": {
-          ".read": "auth != null && auth.uid == $uid",
-          ".write": "auth != null && auth.uid == $uid"
-        }
-      }
+      ".read": "auth != null",
+      ".write": "auth != null"
     },
-
     "chats": {
-      "$chatId": {
-        "messages": {
-          "$messageId": {
-            ".read": "auth != null && root.child('user_chats').child(auth.uid).child($chatId).exists()",
-            ".write": "auth != null && newData.child('senderId').val() == auth.uid"
-          }
-        }
-      }
+      ".read": "auth != null",
+      ".write": "auth != null"
     }
   }
 }

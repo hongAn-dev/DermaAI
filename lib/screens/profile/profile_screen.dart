@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/utils/color_utils.dart';
@@ -14,7 +15,7 @@ class ProfileScreen extends StatelessWidget {
 
     // A map to associate routes with their titles and icons
     final settingsItems = {
-      'ACCOUNT': [
+      'TÀI KHOẢN': [
         {
           'icon': Icons.person_outline,
           'title': 'Thông tin cá nhân',
@@ -26,14 +27,7 @@ class ProfileScreen extends StatelessWidget {
           'route': '/profile/subscription'
         },
       ],
-      'PREFERENCES': [
-        {
-          'icon': Icons.palette_outlined,
-          'title': 'Giao diện',
-          'route': '/profile/appearance'
-        },
-      ],
-      'SECURITY & PRIVACY': [
+      'BẢO MẬT & QUYỀN RIÊNG TƯ': [
         {
           'icon': Icons.lock_outline,
           'title': 'Thay đổi mật khẩu',
@@ -112,59 +106,106 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildProfileHeader(User? user, BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(Responsive.scale(context, 16.0)),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(Responsive.scale(context, 12.0)),
-        boxShadow: [
-          BoxShadow(
-            color: colorWithOpacity(Colors.grey, 0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: Responsive.avatarRadius(context, base: 30),
-            backgroundImage: AssetImage('assets/images/default_avatar.png'),
-          ),
-          SizedBox(width: Responsive.scale(context, 16)),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                user?.displayName ?? 'Eleanor Vance',
-                style: GoogleFonts.manrope(
-                  fontWeight: FontWeight.bold,
-                  fontSize: Responsive.fontSize(context, 18),
+    if (user == null) return const SizedBox.shrink();
+
+    return StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .snapshots(),
+        builder: (context, snapshot) {
+          String displayName = user.displayName ?? 'No Name';
+          String email = user.email ?? 'No Email';
+          String? photoUrl = user.photoURL;
+
+          // Use Firestore data if available, as it might be fresher or have more fields if we decided to diverge
+          if (snapshot.hasData && snapshot.data!.exists) {
+            final data = snapshot.data!.data() as Map<String, dynamic>;
+            if (data.containsKey('displayName'))
+              displayName = data['displayName'];
+            // email is usually Auth managed, but if stored in DB:
+            if (data.containsKey('email')) email = data['email'];
+            if (data.containsKey('photoUrl')) photoUrl = data['photoUrl'];
+          }
+
+          ImageProvider? backgroundImage;
+          if (photoUrl != null && photoUrl.isNotEmpty) {
+            if (photoUrl.startsWith('http')) {
+              backgroundImage = NetworkImage(photoUrl);
+            } else if (photoUrl.startsWith('assets')) {
+              backgroundImage = AssetImage(photoUrl);
+            }
+          }
+
+          return Container(
+            padding: EdgeInsets.all(Responsive.scale(context, 16.0)),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius:
+                  BorderRadius.circular(Responsive.scale(context, 12.0)),
+              boxShadow: [
+                BoxShadow(
+                  color: colorWithOpacity(Colors.grey, 0.1),
+                  spreadRadius: 1,
+                  blurRadius: 5,
                 ),
-              ),
-              SizedBox(height: Responsive.scale(context, 4)),
-              Text(
-                user?.email ?? 'eleanor.vance@example.com',
-                style: GoogleFonts.manrope(
-                  color: Colors.grey[600],
-                  fontSize: Responsive.fontSize(context, 14),
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          CircleAvatar(
-            backgroundColor: const Color(0xFF18A0FB),
-            radius: Responsive.avatarRadius(context, base: 20),
-            child: IconButton(
-              icon: Icon(Icons.edit,
-                  color: Colors.white, size: Responsive.scale(context, 16)),
-              onPressed: () => context.go('/profile/personal_information'),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: Responsive.avatarRadius(context, base: 30),
+                  backgroundColor: Colors.grey[200],
+                  backgroundImage: backgroundImage,
+                  child: backgroundImage == null
+                      ? Text(
+                          displayName.isNotEmpty
+                              ? displayName[0].toUpperCase()
+                              : '?',
+                          style: GoogleFonts.manrope(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue),
+                        )
+                      : null,
+                ),
+                SizedBox(width: Responsive.scale(context, 16)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      style: GoogleFonts.manrope(
+                        fontWeight: FontWeight.bold,
+                        fontSize: Responsive.fontSize(context, 18),
+                      ),
+                    ),
+                    SizedBox(height: Responsive.scale(context, 4)),
+                    Text(
+                      email,
+                      style: GoogleFonts.manrope(
+                        color: Colors.grey[600],
+                        fontSize: Responsive.fontSize(context, 14),
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                CircleAvatar(
+                  backgroundColor: const Color(0xFF18A0FB),
+                  radius: Responsive.avatarRadius(context, base: 20),
+                  child: IconButton(
+                    icon: Icon(Icons.edit,
+                        color: Colors.white,
+                        size: Responsive.scale(context, 16)),
+                    onPressed: () =>
+                        context.go('/profile/personal_information'),
+                  ),
+                ),
+              ],
+            ),
+          );
+        });
   }
 
   Widget _buildSectionTitle(BuildContext context, String title) {

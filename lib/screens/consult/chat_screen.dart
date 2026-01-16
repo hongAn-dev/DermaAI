@@ -20,9 +20,9 @@ import '../../data/models/doctor_model.dart';
 import '../../view_models/chat_view_model.dart';
 
 // --- ZEGOCLOUD CONFIGURATION ---
-const int yourAppID = 971082061; // <-- Replace with your real App ID
+const int yourAppID = 184169380; // <-- Replace with your real App ID
 const String yourAppSign =
-    'f4cbc28dd585f858977af5273778ac05a1abd15b431191f18d607f0cd1bd201f'; // <-- Replace with your real App Sign
+    '327939298e0a7e9c5353adf889804bf233b75943f46629e47f176e1002b3155d'; // <-- Replace with your real App Sign
 // --------------------------
 
 class ChatScreen extends StatefulWidget {
@@ -78,11 +78,29 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _initChatListener() {
+  void _initChatListener() async {
     final viewModel = context.read<ChatViewModel>();
     final chatId = viewModel.getChatId(currentUid, widget.doctor.uid);
+    debugPrint('--- ChatScreen Debug ---');
+    debugPrint('Current UID: $currentUid');
+    debugPrint('Doctor UID: ${widget.doctor.uid}');
+    debugPrint('Generated ChatID: $chatId');
+    debugPrint('------------------------');
 
-    _messagesStream = viewModel.getMessagesStream(chatId);
+    // Fetch startAt timestamp (if user cleared history)
+    int? startAt;
+    try {
+      final prefSnap = await FirebaseDatabase.instance
+          .ref('user_chat_prefs/$currentUid/$chatId/visibleFrom')
+          .get();
+      if (prefSnap.exists && prefSnap.value != null) {
+        startAt = prefSnap.value as int;
+      }
+    } catch (e) {
+      debugPrint('Error fetching chat prefs: $e');
+    }
+
+    _messagesStream = viewModel.getMessagesStream(chatId, startAt: startAt);
     _messagesStream!.listen((event) {
       final snapshot = event.snapshot;
       final kids = snapshot.children;
@@ -251,24 +269,17 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (confirm == true) {
                   final chatId =
                       RealtimeService.chatId(currentUid, widget.doctor.uid);
-                  // Delete for self
+
+                  // Soft Delete
+                  // 1. Set visibleFrom
+                  await FirebaseDatabase.instance
+                      .ref('user_chat_prefs/$currentUid/$chatId/visibleFrom')
+                      .set(ServerValue.timestamp);
+
+                  // 2. Remove from my inbox
                   await FirebaseDatabase.instance
                       .ref('user_chats/$currentUid/$chatId')
                       .remove();
-                  // Delete global chat (optional, usually apps just delete ref)
-                  // But here user asked to delete conversation
-                  // Let's delete for self first to hide it.
-                  // If we want to delete for both, we need to delete 'chats/$chatId'
-
-                  // Delete message history
-                  await FirebaseDatabase.instance.ref('chats/$chatId').remove();
-
-                  // Delete for other user if needed (optional)
-                  if (widget.doctor.uid.isNotEmpty) {
-                    await FirebaseDatabase.instance
-                        .ref('user_chats/${widget.doctor.uid}/$chatId')
-                        .remove();
-                  }
 
                   if (mounted) Navigator.pop(context);
                 }
@@ -440,8 +451,22 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: (otherImage == null ||
                                 otherImage.isEmpty ||
                                 !otherImage.startsWith('http'))
-                            ? Image.asset('assets/images/doctor_avatar.png',
-                                fit: BoxFit.cover)
+                            ? Container(
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  otherName.isNotEmpty
+                                      ? otherName[0].toUpperCase()
+                                      : '?',
+                                  style: GoogleFonts.manrope(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue,
+                                      fontSize: 16),
+                                ),
+                              )
                             : null,
                       ),
                       title: Text(otherName,
@@ -458,8 +483,23 @@ class _ChatScreenState extends State<ChatScreen> {
                       selectedTileColor: Colors.blue.withOpacity(0.05),
                       onTap: () {
                         // Switch chat
-                        final did = chat['otherId'] as String? ?? '';
-                        if (did == widget.doctor.uid) return; // already active
+                        var did = chat['otherId'] as String? ?? '';
+                        final chatId = chat['chatId'] as String? ?? '';
+
+                        // Fallback logic if otherId is empty
+                        if (did.isEmpty && chatId.contains('_')) {
+                          final parts = chatId.split('_');
+                          if (parts.length == 2) {
+                            if (parts[0] == currentUid) {
+                              did = parts[1];
+                            } else if (parts[1] == currentUid) {
+                              did = parts[0];
+                            }
+                          }
+                        }
+
+                        if (did.isEmpty || did == widget.doctor.uid)
+                          return; // already active or invalid
 
                         final dName = chat['otherName'] ?? 'Unknown';
                         final dImage =
@@ -580,12 +620,17 @@ class _ChatScreenState extends State<ChatScreen> {
                         ? NetworkImage(widget.doctor.imagePath)
                         : AssetImage(widget.doctor.imagePath) as ImageProvider)
                     : null,
-                child: (widget.doctor.imagePath.trim().isEmpty ||
-                        (widget.doctor.imagePath.startsWith('http') == false &&
-                            widget.doctor.imagePath.startsWith('assets') ==
-                                false))
-                    ? Image.asset('assets/images/doctor_avatar.png',
-                        fit: BoxFit.cover)
+                child: (widget.doctor.imagePath.isEmpty ||
+                        (!widget.doctor.imagePath.startsWith('http') &&
+                            !widget.doctor.imagePath.startsWith('assets')))
+                    ? Text(
+                        widget.doctor.name.isNotEmpty
+                            ? widget.doctor.name[0].toUpperCase()
+                            : '?',
+                        style: TextStyle(
+                            color: Colors.grey[800],
+                            fontWeight: FontWeight.bold),
+                      )
                     : null,
               ),
             ),

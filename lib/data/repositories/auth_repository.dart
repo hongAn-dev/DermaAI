@@ -24,6 +24,10 @@ class AuthRepository {
     required String password,
     required String displayName,
     required String role,
+    String? phoneNumber,
+    String? birthDate,
+    String? gender,
+    String? address,
   }) async {
     final credential = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
@@ -38,6 +42,10 @@ class AuthRepository {
         'displayName': displayName.trim(),
         'email': user.email ?? email,
         'role': role,
+        if (phoneNumber != null) 'phoneNumber': phoneNumber,
+        if (birthDate != null) 'birthDate': birthDate,
+        if (gender != null) 'gender': gender,
+        if (address != null) 'address': address,
       };
 
       // Sync to Realtime DB
@@ -47,6 +55,7 @@ class AuthRepository {
       await _firestoreService.ensureUserDoc(user.uid, {
         ...userData,
         'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
     }
     return user;
@@ -58,5 +67,9 @@ class AuthRepository {
 
   Future<void> sendPasswordResetEmail(String email) async {
     await _auth.sendPasswordResetEmail(email: email.trim());
+  }
+
+  Future<bool> isPhoneNumberTaken(String phoneNumber) async {
+    return await _firestoreService.checkPhoneNumberExists(phoneNumber.trim());
   }
 }

@@ -219,48 +219,101 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeroSection(BuildContext context, String name) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Xin chào, $name 👋',
-              style: GoogleFonts.manrope(
-                fontSize: Responsive.fontSize(context, 28),
-                fontWeight: FontWeight.w800,
-                color: Theme.of(context).colorScheme.onSurface,
+    if (user == null) return const SizedBox.shrink();
+
+    return StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(user!.uid)
+            .snapshots(),
+        builder: (context, snapshot) {
+          String displayName = name;
+          String? photoUrl = user?.photoURL;
+
+          if (snapshot.hasData && snapshot.data!.exists) {
+            final data = snapshot.data!.data() as Map<String, dynamic>;
+            if (data.containsKey('displayName')) {
+              displayName = data['displayName'] ?? name;
+            }
+            if (data.containsKey('photoUrl')) {
+              photoUrl = data['photoUrl'];
+            }
+          }
+
+          ImageProvider? backgroundImage;
+          if (photoUrl != null && photoUrl.isNotEmpty) {
+            if (photoUrl.startsWith('http')) {
+              backgroundImage = NetworkImage(photoUrl);
+            } else if (photoUrl.startsWith('assets')) {
+              backgroundImage = AssetImage(photoUrl);
+            }
+          }
+
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Xin chào, $displayName 👋',
+                      style: GoogleFonts.manrope(
+                        fontSize: Responsive.fontSize(context, 28),
+                        fontWeight: FontWeight.w800,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: Responsive.scale(context, 4)),
+                    Text(
+                      "Hôm nay bạn cảm thấy làn da thế nào?",
+                      style: GoogleFonts.manrope(
+                        fontSize: Responsive.fontSize(context, 16),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.6),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            SizedBox(height: Responsive.scale(context, 4)),
-            Text(
-              "Hôm nay bạn cảm thấy làn da thế nào?",
-              style: GoogleFonts.manrope(
-                fontSize: Responsive.fontSize(context, 16),
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        Container(
-          height: Responsive.scale(context, 50),
-          width: Responsive.scale(context, 50),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: Theme.of(context).colorScheme.primary,
-              width: 2,
-            ),
-            image: const DecorationImage(
-              image: AssetImage('assets/images/default_avatar.png'),
-              fit: BoxFit.cover,
-            ),
-          ),
-        )
-      ],
-    );
+              const SizedBox(width: 16),
+              Container(
+                height: Responsive.scale(context, 50),
+                width: Responsive.scale(context, 50),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey[200],
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2,
+                  ),
+                  image: backgroundImage != null
+                      ? DecorationImage(
+                          image: backgroundImage,
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: backgroundImage == null
+                    ? Center(
+                        child: Text(
+                        displayName.isNotEmpty
+                            ? displayName[0].toUpperCase()
+                            : '?',
+                        style: GoogleFonts.manrope(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                            fontSize: Responsive.fontSize(context, 20)),
+                      ))
+                    : null,
+              )
+            ],
+          );
+        });
   }
 
   Widget _buildQuickActions(BuildContext context) {

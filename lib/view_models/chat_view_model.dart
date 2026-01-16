@@ -25,8 +25,9 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   // Stream Messages
-  Stream<DatabaseEvent> getMessagesStream(String chatId) {
-    return _chatRepository.getMessages(chatId);
+  // Stream Messages
+  Stream<DatabaseEvent> getMessagesStream(String chatId, {int? startAt}) {
+    return _chatRepository.getMessages(chatId, startAt: startAt);
   }
 
   // Send Text Message
@@ -43,6 +44,7 @@ class ChatViewModel extends ChangeNotifier {
 
     final messageData = {
       'senderId': senderId,
+      'otherId': otherId, // Critical for inbox updates
       'text': text.trim(),
       'type': 'text',
       'timestamp': ServerValue.timestamp,
@@ -76,6 +78,7 @@ class ChatViewModel extends ChangeNotifier {
         if (imageUrl != null) {
           final messageData = {
             'senderId': senderId,
+            'otherId': otherId, // Critical for inbox updates
             'text': 'Đã gửi một ảnh',
             'imageUrl': imageUrl,
             'type': 'image',
@@ -107,19 +110,46 @@ class ChatViewModel extends ChangeNotifier {
     String? otherName,
     String? otherImage,
   }) async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    // Use withData: true to ensure bytes are available on mobile (simplifies upload logic)
+    // Warning: High memory usage for large files.
+    FilePickerResult? result =
+        await FilePicker.platform.pickFiles(withData: true);
 
     if (result != null) {
       _setUploading(true);
       try {
-        final fileBytes = result.files.first.bytes;
+        Uint8List? fileBytes = result.files.first.bytes;
         final fileName = result.files.first.name;
+
+        // On Mobile/Desktop IO, bytes might be null, need to read from path
+        if (fileBytes == null && result.files.first.path != null) {
+          // We need 'dart:io' but this is a ViewModel.
+          // Ideally use a cross-platform helper or check kIsWeb.
+          // Since we can't easily import dart:io conditionally in clean arch without conditional imports,
+          // and we want to keep it simple:
+          // We will assume the UI/Service can handle path, OR we force read it.
+          // However, UploadService expects bytes.
+          // Let's defer to a helper or simply use CrossFile/XFile approaches if possible.
+          // For now, let's try to grab bytes via XFile since we have image_picker anyway,
+          // BUT FilePicker result isn't XFile.
+
+          // QUICK FIX: file_picker usually returns path on mobile.
+          // We can't use File(path).readAsBytes() easily without importing dart:io.
+          // Let's use `createFileFromPath` logic or similar found in typical Flutter apps.
+          // Actually, simpler: instruct FilePicker to load with Data on mobile if performance is okay (users send small files).
+          // But `sendMessage` implies potentially larger files.
+
+          // Better approach: Update `ChatViewModel` to be platform aware or modify `withData`.
+          // Let's try changing the `pickFiles` call to `withData: true` for now (easiest fix),
+          // although memory heavy, it ensures bytes are present.
+        }
 
         if (fileBytes != null) {
           final fileUrl = await _chatRepository.uploadFile(fileBytes, fileName);
           if (fileUrl != null) {
             final messageData = {
               'senderId': senderId,
+              'otherId': otherId, // Critical for inbox updates
               'text': 'Đã gửi tệp: $fileName',
               'fileUrl': fileUrl,
               'fileName': fileName,

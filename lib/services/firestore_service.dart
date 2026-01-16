@@ -51,7 +51,8 @@ class FirestoreService {
           disease: prediction['className'] as String? ?? 'N/A',
           probability:
               (prediction['confidenceScore'] as num?)?.toDouble() ?? 0.0,
-          recommendation: "Tham khảo ý kiến bác sĩ da liễu để được chẩn đoán chuyên môn.",
+          recommendation:
+              "Tham khảo ý kiến bác sĩ da liễu để được chẩn đoán chuyên môn.",
           imageUrl: data['imagePath'] as String? ?? '', // Will be empty
           timestamp: (scanResult['timestamp'] as Timestamp? ?? Timestamp.now())
               .toDate(),
@@ -81,5 +82,14 @@ class FirestoreService {
       print('Error writing user doc: $e');
       rethrow;
     }
+  }
+
+  Future<bool> checkPhoneNumberExists(String phoneNumber) async {
+    final query = await _db
+        .collection('users')
+        .where('phoneNumber', isEqualTo: phoneNumber)
+        .limit(1)
+        .get();
+    return query.docs.isNotEmpty;
   }
 }
