@@ -12,14 +12,23 @@ DermaAI là ứng dụng đa nền tảng (Mobile & Web) thông minh giúp ngư�
 ## 📸 Demo & Giao diện (Screenshots)
 
 ### 📱 Giao diện Mobile (Android/iOS)
-| Màn hình Chụp/Scan | Kết quả Phân tích AI | Chat & Video Call | Danh sách Bác sĩ |
-|:------------------:|:--------------------:|:-----------------:|:----------------:|
-| <img src="LINK_ANH_SCAN_CUA_BAN" width="200"> | <img src="LINK_ANH_KET_QUA_CUA_BAN" width="200"> | <img src="LINK_ANH_CHAT_CUA_BAN" width="200"> | <img src="LINK_ANH_BAC_SI_CUA_BAN" width="200"> |
+
+| Màn hình Chính | Quét & Phân tích | Tư vấn Bác sĩ | Lịch sử |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/images/screenshots/mobile_home.png" width="200" alt="Home"> | <img src="assets/images/screenshots/mobile_scan.png" width="200" alt="Scan"> | <img src="assets/images/screenshots/mobile_consult.png" width="200" alt="Consult"> | <img src="assets/images/screenshots/mobile_history.png" width="200" alt="History"> |
+| *Trang chủ* | *Quét bệnh lý* | *Chat & Video Call* | *Lịch sử khám* |
 
 ### 💻 Giao diện Web (Dashboard)
-<div align="center">
-  <img src="LINK_ANH_WEB_TONG_QUAN_CUA_BAN" width="100%" alt="Web Dashboard">
-</div>
+
+| 📊 Tổng quan (Dashboard) | 💬 Màn hình Chat |
+|:---:|:---:|
+| <img src="assets/images/screenshots/web_home.png" width="100%" alt="Web Home"> | <img src="assets/images/screenshots/web-chat.png" width="100%" alt="Web Chat"> |
+| *Giao diện Dashboard* | *Tư vấn trực tuyến* |
+
+| **🔍 Màn hình Phân tích** | **🔐 Đăng nhập** |
+|:---:|:---:|
+| <img src="assets/images/screenshots/web-scan.png" width="100%" alt="Web Scan"> | <img src="assets/images/screenshots/login_web.png" width="100%" alt="Login Web"> |
+| *Giao diện AI Scan* | *Trang đăng nhập* |
 
 ---
 
@@ -36,10 +45,9 @@ DermaAI là ứng dụng đa nền tảng (Mobile & Web) thông minh giúp ngư�
 * **Hồ sơ chi tiết:** Xem thông tin chi tiết của từng bác sĩ.
 
 ### 3. 💬 Trò chuyện & Video Call (Chat & Call)
-* **Chat Realtime:** Nhắn tin thời gian thực với bác sĩ qua Firebase Realtime Database.
-    * Gửi tin nhắn văn bản, **hình ảnh** và **tệp tin** (PDF, Doc).
-    * **Sửa & Xóa** tin nhắn.
-* **Video Call:** Tích hợp **ZegoCloud** cho phép gọi video chất lượng cao, ổn định ngay trong ứng dụng.
+* **Chat Realtime:** Nhắn tin thời gian thực với bác sĩ.
+    * Gửi tin nhắn văn bản, hình ảnh và tệp tin.
+* **Video Call:** Tích hợp **ZegoCloud** cho phép gọi video chất lượng cao.
 
 ### 4. 📝 Quản lý Lịch sử (History Management)
 * **Lưu trữ tự động:** Tự động lưu lại kết quả các lần quét da.
@@ -62,12 +70,6 @@ DermaAI là ứng dụng đa nền tảng (Mobile & Web) thông minh giúp ngư�
 
 ## 🚀 Hướng dẫn Cài đặt & Chạy Dự án
 
-### Yêu cầu Tiên quyết
-* [Flutter SDK](https://docs.flutter.dev/get-started/install)
-* [Python 3.8+](https://www.python.org/downloads/)
-* Tài khoản Firebase & ZegoCloud (đã cấu hình trong code).
-
-### Bước 1: Cài đặt Dependencies Frontend
-Tại thư mục gốc của dự án:
+### Bước 1: Cài đặt Dependencies
 ```bash
 flutter pub get
